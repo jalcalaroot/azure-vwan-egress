@@ -22,14 +22,20 @@ Salida centralizada a internet con Virtual WAN. Diseño y razones en `docs/desig
 - La conexión que anuncia el 0/0 lleva `internet_security_enabled = false`; las de los spokes `true`.
 - El 0/0 no se propaga entre hubs.
 
+## Estado
+
+Desplegado y probado el 2026-10-19; **destruido** el mismo día (Azure verificado en 0). Evidencia en `docs/evidencia.md`. Para volver a probar: `terraform apply` (~35 min por el hub, ~US$1,6/h) y destruir al terminar.
+
 ## Validado
 
-`terraform validate`, `tflint` y `plan` (57 recursos a crear). El comportamiento de rutas de extremo a extremo se prueba con la VM de `app1` (ver README).
+`terraform validate`, `tflint`, `plan` (57 recursos) y despliegue real: las 2 VMs de `app1` (zonas 1 y 2) salen a internet con la IP del NAT Gateway pasando por el firewall (logs `Allow`). Pendiente de explicar: cuelgues puntuales en los primeros minutos desde la zona 2 (ver evidencia).
 
 ## Pendiente
 
 - Probar el aislamiento entre spokes: hace falta un segundo spoke (solo hay `app1`).
-- Revisar rutas efectivas de la NIC de la VM tras desplegar.
+- Repetir la prueba desde los primeros minutos tras el despliegue para entender los cuelgues puntuales de la zona 2.
+- Probar la entrada por las subnets públicas (appgw/balanceador) y AKS/Container Apps/Function dentro de `app1`.
+- Quitar `zones` del firewall (Microsoft recomienda omitirlo; en eastus ya es zona-redundante).
 - `app1` ya aplica el contrato (`app1_*.tf`); el repo `azure-virtual-network` NO se usará ni se modifica.
 - (histórico) Aplicar el contrato en `azure-virtual-network` (quitar NAT, route tables de las subnets de entrada, conexión al hub, address space único) y en los consumidores (AKS `outbound_type`).
 - CI: workflows plan/apply e identidades. **Los permisos de CI deben vivir en un root persistente separado** (lección de `azure-virtual-network`: al destruir la VNet se perdían los roles de CI).

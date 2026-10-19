@@ -80,3 +80,9 @@ variable "test_vm_size" {
   type        = string
   default     = "Standard_D2as_v4"
 }
+
+variable "test_vm_zones" {
+  description = "Zonas de disponibilidad donde se despliega una VM de prueba en app1 (una por zona). Con 2 zonas se comprueba que la salida funciona desde ambas."
+  type        = list(string)
+  default     = ["1", "2"]
+}

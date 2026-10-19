@@ -89,7 +89,7 @@ No cubre la caída de una región completa (un solo hub). Para DR habría que re
 | Subnets de entrada (public, appgw, apim) | public con 0/0 → Internet; appgw y apim sin route table | Las tres con route table 0/0 → Internet |
 | Nombres | `nsg-snet-*`, `rt-*`, `asg-*` | sufijo `app1` (un solo resource group compartido) |
 
-En `snet-app` hay una **VM de prueba** (`vm-app1-test`, sin IP pública, `Standard_D2as_v4`; los B-series x86 no están disponibles en la suscripción). Si sale a internet, lo hace solo por app1 → hub → firewall → NAT Gateway.
+En `snet-app` hay **dos VMs de prueba**, una por zona (`vm-app1-test-z1` y `-z2`, sin IP pública, `Standard_D2as_v4`; los B-series x86 no están disponibles en la suscripción). Las subnets de Azure abarcan todas las zonas ([Reliability in Azure Virtual Network](https://learn.microsoft.com/azure/reliability/reliability-virtual-network)), así que ambas comparten subnet. Si salen a internet, lo hacen solo por app1 → hub → firewall → NAT Gateway.
 
 ## Qué NO hace este repo
 
