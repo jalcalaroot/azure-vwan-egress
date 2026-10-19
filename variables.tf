@@ -74,3 +74,9 @@ variable "log_analytics_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "test_vm_size" {
+  description = "Tamano de la VM de prueba en app1. B1s/B2s (x86) no estan disponibles en la suscripcion de la cuenta (NotAvailableForSubscription); D2as_v4 si, con cuota."
+  type        = string
+  default     = "Standard_D2as_v4"
+}

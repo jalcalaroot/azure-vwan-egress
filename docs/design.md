@@ -78,9 +78,22 @@ El firewall además **niega destinos RFC1918** (variable `block_private_destinat
 
 No cubre la caída de una región completa (un solo hub). Para DR habría que repetir hub + egress en una segunda región.
 
+## VNet de aplicación `app1`
+
+`app1` (10.1.0.0/16) vive en este repo (`app1_*.tf`) y tiene **las mismas 10 capas** que `azure-virtual-network`: public, appgw, app, data, aks, privatelink, containerapps, aks-virtual-nodes, func y apim, cada una con su NSG (`nsg-app1-snet-*`, salida abierta explícita) y los 7 ASG (`asg-app1-*`). Diferencias:
+
+| | VNet conocida | `app1` |
+|---|---|---|
+| NAT Gateway propio | Sí | **No**: sale por el hub |
+| Salida de las subnets privadas (app, data, aks, privatelink) | NAT Gateway | Ruta 0.0.0.0/0 aprendida del hub (data sigue sin internet: 0/0 → None) |
+| Subnets de entrada (public, appgw, apim) | public con 0/0 → Internet; appgw y apim sin route table | Las tres con route table 0/0 → Internet |
+| Nombres | `nsg-snet-*`, `rt-*`, `asg-*` | sufijo `app1` (un solo resource group compartido) |
+
+En `snet-app` hay una **VM de prueba** (`vm-app1-test`, sin IP pública, `Standard_D2as_v4`; los B-series x86 no están disponibles en la suscripción). Si sale a internet, lo hace solo por app1 → hub → firewall → NAT Gateway.
+
 ## Qué NO hace este repo
 
-- No crea las VNets de aplicación; las conectan ellas con `modules/spoke-connection` (ver `spoke-contract.md`).
+- Solo hay una VNet de aplicación (`app1`); otras se conectan con `modules/spoke-connection` (ver `spoke-contract.md`). El aislamiento entre spokes no se puede probar con una sola.
 - No define DNS privado centralizado (las zonas `privatelink.*` siguen vinculadas por VNet).
 - No filtra por FQDN (salida abierta por decisión del propietario; se puede endurecer añadiendo reglas de aplicación antes de la regla `allow-all-outbound`).
 - No incluye CI ni identidades de CI todavía (ver pendientes en `CLAUDE.md`).
@@ -93,6 +106,7 @@ No cubre la caída de una región completa (un solo hub). Para DR habría que re
 | Virtual WAN Standard hub | US$0,25/h | ~US$183 |
 | NAT Gateway StandardV2 | US$4/mes | US$4 |
 | IPs públicas (2) y Log Analytics | pocos centavos/h | ~US$10-15 (sin verificar) |
-| **Total sin tráfico** | **~US$1,51/h (~US$36/día)** | **~US$1.100** |
+| VM de prueba D2as_v4 | ~US$0,1/h (sin verificar) | ~US$70 |
+| **Total sin tráfico** | **~US$1,6/h (~US$38/día)** | **~US$1.170** |
 
 Además se cobra por GB procesado: hub US$0,02/GB; el firewall y el NAT también cobran por GB (el del firewall no se consultó). El firewall es el 80 % del costo. El hub tarda 20-30 min en crearse. Es una POC para levantar, probar y dar de baja el mismo día: unas 3 horas de prueba cuestan ~US$5.

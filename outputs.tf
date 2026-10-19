@@ -22,3 +22,13 @@ output "firewall_private_ip" {
   description = "IP privada del firewall (siguiente salto del 0.0.0.0/0)."
   value       = azurerm_firewall.egress.ip_configuration[0].private_ip_address
 }
+
+output "app1_vnet_id" {
+  description = "ID de la VNet de aplicacion app1"
+  value       = module.vnet.resource_id
+}
+
+output "test_vm_name" {
+  description = "VM de prueba en app1 (sin IP publica). Se prueba con az vm run-command."
+  value       = azurerm_linux_virtual_machine.test.name
+}
