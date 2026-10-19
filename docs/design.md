@@ -85,6 +85,14 @@ No cubre la caída de una región completa (un solo hub). Para DR habría que re
 - No filtra por FQDN (salida abierta por decisión del propietario; se puede endurecer añadiendo reglas de aplicación antes de la regla `allow-all-outbound`).
 - No incluye CI ni identidades de CI todavía (ver pendientes en `CLAUDE.md`).
 
-## Costo (orden de magnitud, precios de lista aproximados: verificar en la calculadora de precios)
+## Costo (precios de lista de Azure Retail Prices, eastus, consultados el 2026-10-19)
 
-Mientras esté desplegado, sin tráfico: hub Standard (~US$0,25/h) + Azure Firewall Standard (~US$1,25/h) + NAT Gateway y 2 IPs públicas + Log Analytics ≈ **US$1,6-1,8 por hora (~US$1.200-1.300 al mes)**, más procesamiento por GB en hub, firewall y NAT. El hub tarda 20-30 min en crearse. Es una POC para levantar, probar y dar de baja el mismo día.
+| Componente | Precio | Mensual (730 h) |
+|---|---|---|
+| Azure Firewall Standard | US$1,25/h | ~US$912 |
+| Virtual WAN Standard hub | US$0,25/h | ~US$183 |
+| NAT Gateway StandardV2 | US$4/mes | US$4 |
+| IPs públicas (2) y Log Analytics | pocos centavos/h | ~US$10-15 (sin verificar) |
+| **Total sin tráfico** | **~US$1,51/h (~US$36/día)** | **~US$1.100** |
+
+Además se cobra por GB procesado: hub US$0,02/GB; el firewall y el NAT también cobran por GB (el del firewall no se consultó). El firewall es el 80 % del costo. El hub tarda 20-30 min en crearse. Es una POC para levantar, probar y dar de baja el mismo día: unas 3 horas de prueba cuestan ~US$5.

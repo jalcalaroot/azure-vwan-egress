@@ -27,4 +27,4 @@ Los spokes se conectan con [`modules/spoke-connection`](modules/spoke-connection
 
 ## Costo
 
-≈ US$1,6-1,8 por hora (~US$1.200-1.300 al mes) mientras esté desplegado. Pensado para levantar, probar y dar de baja. Detalle en [docs/design.md](docs/design.md).
+≈ US$1,51 por hora (~US$36 al día, ~US$1.100 al mes), el 80 % es el Azure Firewall. Pensado para levantar, probar y dar de baja el mismo día. Detalle en [docs/design.md](docs/design.md).
