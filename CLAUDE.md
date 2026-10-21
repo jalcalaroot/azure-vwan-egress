@@ -14,6 +14,10 @@ Salida centralizada a internet con Virtual WAN. Diseño y razones en `docs/desig
 - Los B-series x86 (B1s, B2s...) están `NotAvailableForSubscription` en eastus; la VM de prueba usa `Standard_D2as_v4` (cuota 10).
 - Un solo resource group compartido: los recursos de `app1` llevan sufijo `app1` para no chocar con otras VNets.
 
+## Decisiones
+
+- El firewall mantiene `zones = ["1","2","3"]` explícito (válido y zona-redundante). Microsoft recomienda omitir `zones` en firewalls nuevos, pero el propietario decidió dejarlo así (2026-10-21).
+
 ## Hechos clave (verificados en la documentación de Microsoft)
 
 - El NAT Gateway no está soportado en el hub de vWAN ni en el secured hub; por eso existe `vnet-egress`.
@@ -33,9 +37,8 @@ Desplegado y probado el 2026-10-19; **destruido** el mismo día (Azure verificad
 ## Pendiente
 
 - Probar el aislamiento entre spokes: hace falta un segundo spoke (solo hay `app1`).
-- Repetir la prueba desde los primeros minutos tras el despliegue para entender los cuelgues puntuales de la zona 2.
+- Opcional: repetir la prueba desde los primeros minutos tras el despliegue para entender los cuelgues puntuales de la zona 2 (el firewall y la salida funcionaron; no se vio relación con el firewall).
 - Probar la entrada por las subnets públicas (appgw/balanceador) y AKS/Container Apps/Function dentro de `app1`.
-- Quitar `zones` del firewall (Microsoft recomienda omitirlo; en eastus ya es zona-redundante).
 - `app1` ya aplica el contrato (`app1_*.tf`); el repo `azure-virtual-network` NO se usará ni se modifica.
 - (histórico) Aplicar el contrato en `azure-virtual-network` (quitar NAT, route tables de las subnets de entrada, conexión al hub, address space único) y en los consumidores (AKS `outbound_type`).
 - CI: workflows plan/apply e identidades. **Los permisos de CI deben vivir en un root persistente separado** (lección de `azure-virtual-network`: al destruir la VNet se perdían los roles de CI).
