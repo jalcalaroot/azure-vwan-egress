@@ -77,7 +77,18 @@ resource "azurerm_firewall_policy" "egress" {
   resource_group_name = var.resource_group_name
   sku                 = "Standard"
 
-  threat_intelligence_mode = "Alert"
+  # "Deny" = alerta y bloquea trafico hacia/desde IPs, dominios y URLs
+  # maliciosos conocidos (feed de Microsoft). Recomendado por Microsoft; en
+  # modo "Alert" una regla de red con destino 80/443 enmascara las alertas
+  # (problema conocido). La salida sigue abierta para todo lo demas.
+  threat_intelligence_mode = "Deny"
+
+  # DNS proxy: el firewall escucha en el 53 y reenvia a Azure DNS. Solo surte
+  # efecto en las VNets cuyo servidor DNS sea la IP privada del firewall (ver
+  # var.app1_dns_via_firewall y docs/firewall-review.md).
+  dns {
+    proxy_enabled = true
+  }
 
   tags = local.tags
 }

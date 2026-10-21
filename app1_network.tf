@@ -780,6 +780,8 @@ module "vnet" {
 
   enable_telemetry = false
 
+  dns_servers = var.app1_dns_via_firewall ? { dns_servers = [azurerm_firewall.egress.ip_configuration[0].private_ip_address] } : null
+
   diagnostic_settings = {
     sendToLogAnalytics = {
       workspace_resource_id = azurerm_log_analytics_workspace.this.id

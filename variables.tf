@@ -86,3 +86,9 @@ variable "test_vm_zones" {
   type        = list(string)
   default     = ["1", "2"]
 }
+
+variable "app1_dns_via_firewall" {
+  description = "true: app1 usa la IP privada del firewall como servidor DNS (DNS proxy), con lo que el firewall registra todas las consultas DNS. Con false, app1 sigue con Azure DNS. OJO: Azure Firewall reenvia a Azure DNS desde vnet-egress, asi que las zonas Private DNS (privatelink.*) deben estar vinculadas tambien a vnet-egress, o resolver con Azure DNS Private Resolver. Sin probar: por eso el default es false."
+  type        = bool
+  default     = false
+}
