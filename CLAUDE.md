@@ -39,6 +39,7 @@ Desplegado y probado el 2026-10-19; **destruido** el mismo día (Azure verificad
 ## Pendiente
 
 - Revisión del firewall hecha el 2026-10-21 (ver `docs/firewall-review.md`): inteligencia de amenazas en `Deny` y DNS proxy activado en la política; policy analytics activado en la política; falta probar `app1_dns_via_firewall` y añadir alertas.
+- Reglas por dominio añadidas el 2026-10-21 (sin desplegar): al desplegar, verificar HTTPS sin SNI, QUIC y los logs `AZFWApplicationRule` (ver `docs/firewall-review.md`). `denied_web_categories` queda vacío hasta que se decida Premium.
 - Probar el aislamiento entre spokes: hace falta un segundo spoke (solo hay `app1`).
 - Opcional: repetir la prueba desde los primeros minutos tras el despliegue para entender los cuelgues puntuales de la zona 2 (el firewall y la salida funcionaron; no se vio relación con el firewall).
 - Probar la entrada por las subnets públicas (appgw/balanceador) y AKS/Container Apps/Function dentro de `app1`.
