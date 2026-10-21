@@ -8,36 +8,11 @@ Por qué la salida vive en una VNet de egress y no en el hub: el NAT Gateway no 
 
 ## Arquitectura
 
-```mermaid
-flowchart LR
-    NET(("Internet"))
+![Arquitectura general](docs/img/diagrama-1.png)
 
-    subgraph APP1["app1 (10.1.0.0/16) - sin NAT propio"]
-        direction TB
-        PUB["Subnets de ENTRADA<br/>public · appgw · apim<br/>salida directa (0/0 → Internet)"]
-        PRIV["Subnets privadas<br/>app · data · aks · privatelink<br/>+ containerapps · func · aks-virtual-nodes"]
-        VMS["VM z1 · VM z2<br/>(prueba, sin IP pública)"]
-    end
+Todos los diagramas (arquitectura, camino de un paquete, enrutamiento de Virtual WAN, evaluación de reglas del firewall y zonas de disponibilidad) están en [docs/diagrama.md](docs/diagrama.md).
 
-    subgraph WAN["Virtual WAN"]
-        HUB["Virtual hub 10.250.0.0/23<br/>rt-spokes · rt-egress"]
-    end
-
-    subgraph EG["vnet-egress (10.251.0.0/24)"]
-        FW["Azure Firewall Standard<br/>3 zonas · salida abierta"]
-        NAT["NAT Gateway StandardV2<br/>zona-redundante · IP estable"]
-    end
-
-    NET == "ENTRADA" ==> PUB
-    PUB -. "salida directa" .-> NET
-    PRIV -- "0.0.0.0/0 aprendido del hub" --> HUB
-    VMS -.-> PRIV
-    HUB -- "ruta estática 0/0 → IP del firewall" --> FW
-    FW -- "SNAT" --> NAT
-    NAT == "SALIDA" ==> NET
-```
-
-Las subnets de Azure abarcan todas las zonas de disponibilidad: las dos VMs de prueba están en zonas distintas (1 y 2) dentro de la misma subnet `snet-app`.
+Las VMs de prueba (`vm-app1-test-z1` y `-z2`, sin IP pública) viven en `snet-app`, la subnet privada de `app1`. Las subnets de Azure abarcan todas las zonas de disponibilidad: las dos VMs están en zonas distintas (1 y 2) dentro de la misma subnet.
 
 ## Recursos
 
