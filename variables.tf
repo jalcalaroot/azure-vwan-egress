@@ -75,20 +75,20 @@ variable "log_analytics_retention_days" {
   default     = 30
 }
 
-variable "test_vm_size" {
-  description = "Size of the test VMs in app1."
+variable "probe_vm_size" {
+  description = "Size of the probe VMs in app1."
   type        = string
   default     = "Standard_D2as_v4"
 }
 
-variable "test_vm_zones" {
-  description = "Availability zones that get a test VM in app1 (one VM per zone)."
+variable "probe_vm_zones" {
+  description = "Availability zones that get a probe VM in app1 (one VM per zone)."
   type        = list(string)
   default     = ["1", "2"]
 }
 
 variable "app1_dns_via_firewall" {
-  description = "true: app1 uses the private IP of the firewall as DNS server (DNS proxy), so the firewall logs every DNS query. false: app1 keeps Azure DNS. Takes effect only when set at VNet creation: the VNet module (azapi) does not detect a change from "no DNS servers" to a value on an existing VNet. Note: Azure Firewall forwards to Azure DNS from vnet-egress, so Private DNS zones (privatelink.*) must also be linked to vnet-egress, or resolved through Azure DNS Private Resolver."
+  description = "true: app1 uses the private IP of the firewall as DNS server (DNS proxy), so the firewall logs every DNS query. false: app1 keeps Azure DNS. Takes effect only when set at VNet creation: the VNet module (azapi) does not detect a change from no DNS servers to a value on an existing VNet. Note: Azure Firewall forwards to Azure DNS from vnet-egress, so Private DNS zones (privatelink.*) must also be linked to vnet-egress, or resolved through Azure DNS Private Resolver."
   type        = bool
   default     = false
 }

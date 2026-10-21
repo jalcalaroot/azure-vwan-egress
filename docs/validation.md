@@ -1,6 +1,6 @@
 # Validation
 
-Deployment and egress tests of the stack, run against a live subscription (East US) on two occasions. Subscription IDs and the real public IP are omitted.
+Deployment and egress checks of the stack, run against a live subscription (East US) on two occasions. Subscription IDs and the real public IP are omitted.
 
 ## Run 1 - deployment (2026-10-19)
 
@@ -11,9 +11,9 @@ Deployment and egress tests of the stack, run against a live subscription (East 
 
 ## Run 1 - results
 
-| Test | Result |
+| Check | Result |
 |---|---|
-| Test VMs without public IP in `snet-app` (private subnet, no default outbound) | `vm-app1-test-z1` (zone 1) and `vm-app1-test-z2` (zone 2), both `Succeeded` |
+| Probe VMs without public IP in `snet-app` (private subnet, no default outbound) | `vm-app1-probe-z1` (zone 1) and `vm-app1-probe-z2` (zone 2), both `Succeeded` |
 | Outbound IP seen from the internet (`curl https://ifconfig.me`) | Both VMs return `<NAT_PUBLIC_IP>`, equal to the NAT Gateway IP |
 | HTTPS burst (12 requests to microsoft.com per VM) | 24 of 24 HTTP 200, ~80 ms average, MTU 1500 |
 | Plain HTTP (example.com, 6 per VM) | 12 of 12 HTTP 200 |
@@ -31,7 +31,7 @@ Within the first minutes after the VMs were created, the zone 2 VM had one slow 
 
 Deployed with the domain-level application rules, threat intelligence in `Deny`, DNS proxy and Policy Analytics enabled: 59 resources in ~36 minutes.
 
-| Test | Result |
+| Check | Result |
 |---|---|
 | Egress IP from both zones | Both VMs return the NAT Gateway IP |
 | HTTPS burst right after deployment | Zone 1: 17 of 20 (3 timeouts of 8 s); zone 2: 20 of 20 |
@@ -40,7 +40,7 @@ Deployed with the domain-level application rules, threat intelligence in `Deny`,
 | HTTPS without SNI (bare IP `1.1.1.1`) | Denied; log reason `SNI TLS extension was missing` |
 | Non-web ports (TCP 8080, TCP 22) and ICMP | Allowed by `allow-tcp-non-web` / `allow-icmp` |
 | Private destination (`172.16.5.5:80`) | Denied by `deny-rfc1918`, logged in `AZFWNetworkRule` |
-| Threat intelligence (Microsoft test FQDN) | Blocked (HTTP 470); `AZFWThreatIntel` logs `Deny` with the threat description |
+| Threat intelligence (Microsoft indicator domain) | Blocked (HTTP 470); `AZFWThreatIntel` logs `Deny` with the threat description |
 | Domain visibility | `AZFWApplicationRule` lists every domain (for example `www.microsoft.com`, `ifconfig.me`, `github.com`) under `allow-all-web` |
 | Web category `Gambling` on Standard | Betting sites blocked; log shows rule `deny-categories` and `WebCategory = Gambling`; microsoft.com and github.com stay allowed |
 | Categories `ChildAbuseImages`, `CriminalActivity`, `IllegalSoftware` | Accepted by the API and read back from the policy |
@@ -52,7 +52,7 @@ Deployed with the domain-level application rules, threat intelligence in `Deny`,
 
 The regional Network Watcher answers live diagnostics with no extra configuration; there are no flow logs or connection monitors for this stack.
 
-| Diagnostic from `vm-app1-test-z1` | Result |
+| Diagnostic from `vm-app1-probe-z1` | Result |
 |---|---|
 | Next hop to `8.8.8.8` and to `172.16.5.5` | `VirtualNetworkGateway` (`10.250.0.68`, Gateway Route): the hub |
 | Next hop to an address inside `app1` | `VirtualNetwork` (System Route) |

@@ -17,7 +17,7 @@ Centralized internet egress with Azure Virtual WAN. The design and its reasoning
 - The connection that advertises `0.0.0.0/0` has `internet_security_enabled = false`; spoke connections use `true`.
 - `0.0.0.0/0` does not propagate between hubs.
 - Network rules are evaluated before application rules; a network rule covering 80/443 would make the application rules unreachable.
-- x86 B-series VM sizes are not available in this subscription (`NotAvailableForSubscription`); the test VMs use `Standard_D2as_v4`.
+- x86 B-series VM sizes are not available in this subscription (`NotAvailableForSubscription`); the probe VMs use `Standard_D2as_v4`.
 - A single shared resource group is used, so `app1` resources carry the `app1` suffix.
 - Web categories are accepted and enforced on Standard (FQDN-based) although the azurerm documentation says Premium.
 - The VNet module (azapi) does not detect a change from no DNS servers to a value on an existing VNet; `app1_dns_via_firewall` must be set at creation.
@@ -30,7 +30,7 @@ Deployed and validated twice (see `docs/validation.md`). Cost while deployed is 
 ## Backlog
 
 - Understand the intermittent stalls seen in the first minutes after deployment (not zone-specific).
-- Test QUIC (UDP 443) behavior with an HTTP/3-capable client.
+- Verify QUIC (UDP 443) behavior with an HTTP/3-capable client.
 - Check Policy Analytics data once the hourly aggregation has run.
 - Alerts (health, SNAT utilization, threat intelligence hits).
 - Optional VNet flow logs with Traffic Analytics, and a Connection Monitor, for history per VNet.

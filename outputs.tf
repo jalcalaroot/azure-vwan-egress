@@ -28,7 +28,7 @@ output "app1_vnet_id" {
   value       = module.vnet.resource_id
 }
 
-output "test_vm_names" {
-  description = "Test VMs in app1 (no public IP, one per zone). Check them with az vm run-command."
-  value       = { for z, vm in azurerm_linux_virtual_machine.test : z => vm.name }
+output "probe_vm_names" {
+  description = "Probe VMs in app1 (no public IP, one per zone). Check them with az vm run-command."
+  value       = { for z, vm in azurerm_linux_virtual_machine.probe : z => vm.name }
 }

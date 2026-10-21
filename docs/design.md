@@ -59,7 +59,7 @@ A single hub does not survive a regional outage; disaster recovery would need a 
 | Inbound subnets (public, appgw, apim) | `public` with `0/0 → Internet`; appgw/apim without route table | all three with a `0/0 → Internet` route table |
 | Names | `nsg-snet-*`, `rt-*`, `asg-*` | `app1` suffix (single shared resource group) |
 
-`snet-app` hosts two test VMs, one per availability zone (`vm-app1-test-z1`, `vm-app1-test-z2`), without public IP. Azure subnets span every zone ([Reliability in Azure Virtual Network](https://learn.microsoft.com/azure/reliability/reliability-virtual-network)), so both share the subnet. Their internet access can only go through app1 → hub → firewall → NAT Gateway.
+`snet-app` hosts two probe VMs, one per availability zone (`vm-app1-probe-z1`, `vm-app1-probe-z2`), without public IP. Azure subnets span every zone ([Reliability in Azure Virtual Network](https://learn.microsoft.com/azure/reliability/reliability-virtual-network)), so both share the subnet. Their internet access can only go through app1 → hub → firewall → NAT Gateway.
 
 ## Firewall
 
@@ -81,7 +81,7 @@ List prices, East US (Azure Retail Prices API):
 | Virtual WAN Standard hub | US$0.25/h | ~US$183 |
 | NAT Gateway StandardV2 | US$4/month | US$4 |
 | Public IPs (2) and Log Analytics | a few cents/h | ~US$10-15 |
-| Two test VMs (`Standard_D2as_v4`) | ~US$0.1/h each | ~US$140 |
+| Two probe VMs (`Standard_D2as_v4`) | ~US$0.1/h each | ~US$140 |
 | **Total without traffic** | **~US$1.7/h (~US$40/day)** | **~US$1,250** |
 
 Data processing is charged per GB on the hub (US$0.02/GB), firewall and NAT Gateway. The firewall is about 70% of the cost; Premium (US$1.75/h) adds IDPS, TLS inspection and full-URL filtering. The hub takes ~35 minutes to create, so the stack is meant to be deployed on demand.

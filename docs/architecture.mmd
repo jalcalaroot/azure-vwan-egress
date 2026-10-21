@@ -1,7 +1,7 @@
 flowchart TB
     USERS(["Internet (users)"])
     ENTRY["<b>app1 VNet · ENTRY subnets</b><br/>public · appgw · apim<br/>replies and own egress leave directly"]
-    PRIVATE["<b>app1 VNet · PRIVATE subnets</b><br/>app · aks · privatelink · containerapps · func<br/>Test VMs: zone 1 · zone 2<br/>(app1 has no NAT Gateway of its own)"]
+    PRIVATE["<b>app1 VNet · PRIVATE subnets</b><br/>app · aks · privatelink · containerapps · func<br/>Probe VMs: zone 1 · zone 2<br/>(app1 has no NAT Gateway of its own)"]
     HUB{{"<b>Virtual WAN hub</b> 10.250.0.0/23<br/>learned route 0.0.0.0/0 → firewall"}}
     FW["<b>Egress VNet · Azure Firewall</b><br/>Standard · 3 zones<br/>threat intelligence · logs · SNAT"]
     NAT["<b>Egress VNet · NAT Gateway</b> StandardV2<br/>static public IP"]
