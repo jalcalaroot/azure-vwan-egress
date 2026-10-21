@@ -163,8 +163,8 @@ resource "azurerm_firewall_policy_rule_collection_group" "egress" {
     }
   }
 
-  # Requires a Premium firewall and policy (provider documentation); the list is empty
-  # by default.
+  # Web categories are FQDN-based on the Standard tier (verified); full-URL
+  # categorization requires Premium.
   dynamic "application_rule_collection" {
     for_each = length(var.denied_web_categories) > 0 ? [1] : []
     content {

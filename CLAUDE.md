@@ -19,17 +19,21 @@ Centralized internet egress with Azure Virtual WAN. The design and its reasoning
 - Network rules are evaluated before application rules; a network rule covering 80/443 would make the application rules unreachable.
 - x86 B-series VM sizes are not available in this subscription (`NotAvailableForSubscription`); the test VMs use `Standard_D2as_v4`.
 - A single shared resource group is used, so `app1` resources carry the `app1` suffix.
+- Web categories are accepted and enforced on Standard (FQDN-based) although the azurerm documentation says Premium.
+- The VNet module (azapi) does not detect a change from no DNS servers to a value on an existing VNet; `app1_dns_via_firewall` must be set at creation.
 - The firewall keeps explicit `zones = ["1","2","3"]` (valid and zone-redundant; Microsoft recommends omitting `zones` on new firewalls).
 
 ## Status
 
-Deployed and validated (see `docs/validation.md`). Cost while deployed is about US$1.7/hour, so it is created on demand and destroyed afterwards; the hub takes ~35 minutes.
+Deployed and validated twice (see `docs/validation.md`). Cost while deployed is about US$1.7/hour, so it is created on demand and destroyed afterwards; the hub takes ~35 minutes.
 
 ## Backlog
 
-- Verify the application rules after deployment: HTTPS without SNI, QUIC, and the `AZFWApplicationRule` logs.
-- Test `app1_dns_via_firewall = true` (requires Private DNS zone links on `vnet-egress`).
+- Understand the intermittent stalls seen in the first minutes after deployment (not zone-specific).
+- Test QUIC (UDP 443) behavior with an HTTP/3-capable client.
+- Check Policy Analytics data once the hourly aggregation has run.
 - Alerts (health, SNAT utilization, threat intelligence hits).
+- Optional VNet flow logs with Traffic Analytics, and a Connection Monitor, for history per VNet.
 - Exercise isolation between spokes with a second spoke; inbound through the public subnets; AKS, Container Apps and Function inside `app1`.
 - CI (plan/apply workflows). CI identity permissions must live in a separate persistent root, not in the state of the stack they deploy.
 - Run Checkov (not installed locally).

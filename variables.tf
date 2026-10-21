@@ -88,13 +88,13 @@ variable "test_vm_zones" {
 }
 
 variable "app1_dns_via_firewall" {
-  description = "true: app1 uses the private IP of the firewall as DNS server (DNS proxy), so the firewall logs every DNS query. false: app1 keeps Azure DNS. Note: Azure Firewall forwards to Azure DNS from vnet-egress, so Private DNS zones (privatelink.*) must also be linked to vnet-egress, or resolved through Azure DNS Private Resolver."
+  description = "true: app1 uses the private IP of the firewall as DNS server (DNS proxy), so the firewall logs every DNS query. false: app1 keeps Azure DNS. Takes effect only when set at VNet creation: the VNet module (azapi) does not detect a change from "no DNS servers" to a value on an existing VNet. Note: Azure Firewall forwards to Azure DNS from vnet-egress, so Private DNS zones (privatelink.*) must also be linked to vnet-egress, or resolved through Azure DNS Private Resolver."
   type        = bool
   default     = false
 }
 
 variable "denied_web_categories" {
-  description = "Web categories the firewall denies (HTTP/HTTPS). Empty = none. Per the azurerm provider documentation, web_categories requires a Premium firewall and policy."
+  description = "Web categories the firewall denies (HTTP/HTTPS); categorization is FQDN-based on the Standard tier. Empty = none. Names as listed by the Microsoft.Network/azureWebCategories API."
   type        = list(string)
-  default     = []
+  default     = ["ChildAbuseImages", "CriminalActivity", "IllegalSoftware"]
 }

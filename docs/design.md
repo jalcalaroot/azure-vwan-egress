@@ -84,4 +84,4 @@ List prices, East US (Azure Retail Prices API):
 | Two test VMs (`Standard_D2as_v4`) | ~US$0.1/h each | ~US$140 |
 | **Total without traffic** | **~US$1.7/h (~US$40/day)** | **~US$1,250** |
 
-Data processing is charged per GB on the hub (US$0.02/GB), firewall and NAT Gateway. The firewall is about 70% of the cost; Premium (US$1.75/h) adds IDPS and web categories. The hub takes ~35 minutes to create, so the stack is meant to be deployed on demand.
+Data processing is charged per GB on the hub (US$0.02/GB), firewall and NAT Gateway. The firewall is about 70% of the cost; Premium (US$1.75/h) adds IDPS, TLS inspection and full-URL filtering. The hub takes ~35 minutes to create, so the stack is meant to be deployed on demand.

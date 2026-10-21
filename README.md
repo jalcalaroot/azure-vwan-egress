@@ -16,7 +16,7 @@ A NAT Gateway cannot sit in a Virtual WAN hub or receive traffic from another VN
 | Resource | Purpose | Docs |
 |---|---|---|
 | Virtual WAN (Standard) + virtual hub | Transit service; `rt-spokes` / `rt-egress` route tables, static `0.0.0.0/0` on the egress connection | [Virtual WAN](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about), [Hub routing](https://learn.microsoft.com/azure/virtual-wan/about-virtual-hub-routing) |
-| Azure Firewall (Standard, 3 zones) + Firewall Policy | SNAT, threat intelligence (`Deny`), DNS proxy, rules that log web traffic by domain, Policy Analytics | [Azure Firewall](https://learn.microsoft.com/azure/firewall/overview), [Rule processing](https://learn.microsoft.com/azure/firewall/rule-processing) |
+| Azure Firewall (Standard, 3 zones) + Firewall Policy | SNAT, threat intelligence (`Deny`), DNS proxy, web traffic logged by domain and denied web categories, Policy Analytics | [Azure Firewall](https://learn.microsoft.com/azure/firewall/overview), [Rule processing](https://learn.microsoft.com/azure/firewall/rule-processing) |
 | NAT Gateway (StandardV2) + public IP | The single, stable outbound IP for every spoke | [NAT Gateway](https://learn.microsoft.com/azure/nat-gateway/nat-overview) |
 | `vnet-egress` | Holds `AzureFirewallSubnet` only | [VNet overview](https://learn.microsoft.com/azure/virtual-network/virtual-networks-overview) |
 | `app1` VNet + 10 subnets | Same layers as the known VNet, no own NAT; built on [`Azure/avm-res-network-virtualnetwork` v0.22.2](https://registry.terraform.io/modules/Azure/avm-res-network-virtualnetwork/azurerm/0.22.2) | [Default outbound access](https://learn.microsoft.com/azure/virtual-network/ip-services/default-outbound-access) |
@@ -60,7 +60,7 @@ done
 | `vnet_address_space` and `*_subnet_cidr` | `10.1.0.0/16` and the `10.1.x.x` layout | `app1`; address spaces must not overlap |
 | `spoke_address_space` | `10.0.0.0/13` | Source range the firewall rules accept |
 | `block_private_destinations` | `true` | Firewall denies RFC1918 destinations |
-| `denied_web_categories` | `[]` | Needs Firewall Premium |
+| `denied_web_categories` | `ChildAbuseImages`, `CriminalActivity`, `IllegalSoftware` | Web categories the firewall denies (FQDN-based on Standard) |
 | `app1_dns_via_firewall` | `false` | Use the firewall as DNS (see the note in `variables.tf`) |
 | `test_vm_size` / `test_vm_zones` | `Standard_D2as_v4` / `["1","2"]` | |
 | `log_analytics_retention_days` | `30` | |

@@ -11,7 +11,7 @@ Network rules are evaluated before application rules and are terminating ([Rule 
 | — | Threat intelligence (`Deny`) | Microsoft feed | Blocks traffic to/from known malicious IPs, domains and URLs before any rule runs |
 | 100 | Network, Deny | `deny-rfc1918` | Spokes only reach the internet (`block_private_destinations`) |
 | 200 | Network, Allow | `allow-tcp-non-web` (TCP 1-79, 81-442, 444-65535), `allow-udp-non-quic` (UDP 1-442, 444-65535), `allow-icmp` | Every other port and protocol stays open |
-| 250 | Application, Deny | `deny-categories` (only if `denied_web_categories` is not empty) | Blocks the configured web categories (requires Premium) |
+| 250 | Application, Deny | `deny-categories` (only if `denied_web_categories` is not empty) | Blocks the configured web categories (`ChildAbuseImages`, `CriminalActivity`, `IllegalSoftware` by default); FQDN-based on Standard |
 | 300 | Application, Allow | `allow-all-web` (HTTP 80 and HTTPS 443, FQDN `*`) | Allows web traffic and logs it by domain in `AZFWApplicationRule` |
 
 Behavior to be aware of:
@@ -39,13 +39,15 @@ Sources: [Architecture best practices for Azure Firewall](https://learn.microsof
 | Policy Analytics | Enabled (`insights` block). It analyzes only what happens after it is enabled; data takes ~60 minutes to appear |
 | Application rules with FQDN visibility | Done (`allow-all-web`) |
 | Alerts on throughput, health state, SNAT port utilization, latency probe and threat intelligence hits | Not configured |
-| Web categories | Prepared (`denied_web_categories`), empty: the azurerm provider documents them as Premium-only |
-| IDPS, TLS inspection, URL filtering | Premium only |
+| Web categories | Done (`denied_web_categories`). Accepted and enforced on Standard (categorization by FQDN) even though the azurerm provider documentation says Premium; verified with `Gambling`, which blocked the betting sites and logged `WebCategory` |
+| IDPS, TLS inspection, full-URL categorization and filtering | Premium only |
 | Customer-controlled maintenance | Not configured |
 
 ## DNS proxy
 
 Using the firewall as DNS requires three steps ([DNS settings](https://learn.microsoft.com/azure/firewall/dns-settings)): enable the proxy in the policy (done), choose the upstream servers (Azure DNS by default), and point the VNet DNS servers to the firewall's private IP (`app1_dns_via_firewall = true`).
+
+Verified: with the VNet DNS set to the firewall, the VMs resolved through `10.251.0.4` and the queries appear in `AZFWDnsQuery`. `app1_dns_via_firewall` only takes effect when set at VNet creation, because the VNet module (azapi) does not detect a change from "no DNS servers" to a value on an existing VNet.
 
 The firewall forwards to Azure DNS from `vnet-egress`, so Private DNS zones (`privatelink.*`) must also be linked to `vnet-egress`, or resolved through Azure DNS Private Resolver ([Private Link and DNS in Virtual WAN](https://learn.microsoft.com/azure/architecture/networking/guide/private-link-virtual-wan-dns-single-region-workload)). A VNet with private endpoints would stop resolving them otherwise.
 
@@ -53,5 +55,5 @@ The firewall forwards to Azure DNS from `vnet-egress`, so Private DNS zones (`pr
 
 1. Alerts for health, SNAT utilization and threat intelligence hits (needs an action group).
 2. `app1_dns_via_firewall = true` once the Private DNS zone links are in place.
-3. Deny high-risk web categories (for example *Child abuse images*, *Criminal activity*, *Illegal software*) or evaluate Premium for IDPS.
+3. Add more denied categories, or evaluate Premium for IDPS.
 4. Restrict egress with an allow-list using FQDN tags and domains, if the environment requires closed egress.
