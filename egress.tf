@@ -1,9 +1,9 @@
 # ============================================================================
-# VNet de egress: Azure Firewall (SNAT + politica) detras de NAT Gateway
-# StandardV2 (IPs de salida estables, 64.512 puertos SNAT por IP).
+# Egress VNet: Azure Firewall (SNAT + policy) behind a StandardV2 NAT Gateway
+# (stable outbound IPs, 64,512 SNAT ports per IP).
 #
-# Alta disponibilidad: firewall en 3 zonas + NAT Gateway StandardV2
-# (zona-redundante por diseno; el argumento zones debe omitirse).
+# High availability: firewall in 3 zones + StandardV2 NAT Gateway
+# (zone-redundant by design; the zones argument must be omitted).
 # ============================================================================
 
 resource "azurerm_virtual_network" "egress" {
@@ -22,14 +22,14 @@ resource "azurerm_subnet" "firewall" {
   address_prefixes     = [var.egress_firewall_subnet_cidr]
 }
 
-# --- NAT Gateway StandardV2 (la salida real a internet) -----------------
+# --- NAT Gateway StandardV2 (the actual internet egress) ----------------
 
 resource "azurerm_public_ip" "nat" {
   name                = "pip-nat-egress"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
-  # La regla azurerm_public_ip_invalid_sku de tflint no conoce StandardV2.
+  # The tflint rule azurerm_public_ip_invalid_sku does not know StandardV2.
   sku  = "StandardV2" # tflint-ignore: azurerm_public_ip_invalid_sku
   tags = local.tags
 }
@@ -58,8 +58,8 @@ resource "azurerm_subnet_nat_gateway_association" "firewall" {
 
 # --- Azure Firewall -----------------------------------------------------
 
-# IP propia del firewall (gestion / DNAT entrante). La salida a internet NO
-# usa esta IP: con el NAT Gateway asociado a la subnet, el SNAT sale por el NAT.
+# The firewall's own public IP (management / inbound DNAT). Internet egress does NOT
+# use this IP: with the NAT Gateway on the subnet, SNAT leaves through the NAT.
 resource "azurerm_public_ip" "firewall" {
   name                = "pip-fw-egress"
   location            = var.location
@@ -77,23 +77,22 @@ resource "azurerm_firewall_policy" "egress" {
   resource_group_name = var.resource_group_name
   sku                 = "Standard"
 
-  # "Deny" = alerta y bloquea trafico hacia/desde IPs, dominios y URLs
-  # maliciosos conocidos (feed de Microsoft). Recomendado por Microsoft; en
-  # modo "Alert" una regla de red con destino 80/443 enmascara las alertas
-  # (problema conocido). La salida sigue abierta para todo lo demas.
+  # "Deny" = alert and block traffic to/from known malicious IPs, domains and URLs
+  # (Microsoft feed). Recommended by Microsoft; in "Alert" mode a network rule with
+  # destination 80/443 masks the alerts (known issue). All other egress stays open.
   threat_intelligence_mode = "Deny"
 
-  # DNS proxy: el firewall escucha en el 53 y reenvia a Azure DNS. Solo surte
-  # efecto en las VNets cuyo servidor DNS sea la IP privada del firewall (ver
-  # var.app1_dns_via_firewall y docs/firewall-review.md).
+  # DNS proxy: the firewall listens on port 53 and forwards to Azure DNS. It only
+  # takes effect in VNets whose DNS server is the private IP of the firewall (see
+  # var.app1_dns_via_firewall and docs/firewall.md).
   dns {
     proxy_enabled = true
   }
 
-  # Policy Analytics: reglas poco usadas, flujos principales y analisis por
-  # regla. Necesita el mismo workspace que el diagnostico del firewall, con
-  # logs estructurados (tablas AZFW*) en el plan Analytics. Solo analiza lo
-  # que ocurre despues de activarlo; los datos tardan ~60 min en aparecer.
+  # Policy Analytics: rarely used rules, top flows and per-rule analysis. Needs the
+  # same workspace as the firewall diagnostics, with structured logs (AZFW* tables)
+  # on the Analytics plan. It only analyzes what happens after it is enabled; data
+  # takes ~60 minutes to appear.
   insights {
     enabled                            = true
     default_log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
@@ -103,21 +102,15 @@ resource "azurerm_firewall_policy" "egress" {
   tags = local.tags
 }
 
-# Salida ABIERTA en el firewall: SUPUESTO inicial de diseno, NO una decision
-# explicita del propietario para el firewall (su "la salida debe estar
-# abierta" se dijo sobre los NSG de la VNet). Pendiente de decidir si el
-# firewall debe filtrar (ver docs/firewall-review.md).
-#
-# Orden de evaluacion (Microsoft: las reglas de red van ANTES que las de
-# aplicacion y son terminantes):
-#   1. Red 100  deny RFC1918: los spokes solo salen a internet.
-#   2. Red 200  allow del resto de puertos/protocolos, EXCEPTO TCP 80/443 y
-#      UDP 443 (QUIC): asi el trafico web cae en las reglas de aplicacion,
-#      que lo registran por DOMINIO (tabla AZFWApplicationRule). Los clientes
-#      con QUIC vuelven a TCP 443 por si solos.
-#   3. Aplicacion 250 (opcional) deny de categorias web: var.denied_web_categories.
-#   4. Aplicacion 300 allow HTTP/HTTPS a cualquier dominio.
-# Si una regla de red permitiera 80/443, las de aplicacion nunca se evaluarian.
+# Egress rules. Evaluation order (Microsoft: network rules run BEFORE application
+# rules and are terminating):
+#   1. Network 100  deny RFC1918: spokes only reach the internet.
+#   2. Network 200  allow every other port/protocol EXCEPT TCP 80/443 and UDP 443
+#      (QUIC), so web traffic falls into the application rules, which log it by
+#      DOMAIN (AZFWApplicationRule table). QUIC clients fall back to TCP 443.
+#   3. Application 250 (optional) deny web categories: var.denied_web_categories.
+#   4. Application 300 allow HTTP/HTTPS to any domain.
+# If a network rule allowed 80/443, the application rules would never be evaluated.
 resource "azurerm_firewall_policy_rule_collection_group" "egress" {
   name               = "rcg-egress"
   firewall_policy_id = azurerm_firewall_policy.egress.id
@@ -170,9 +163,8 @@ resource "azurerm_firewall_policy_rule_collection_group" "egress" {
     }
   }
 
-  # Requiere firewall y politica Premium (documentacion del proveedor); con
-  # Standard la API probablemente lo rechace. Por eso la lista esta vacia por
-  # defecto.
+  # Requires a Premium firewall and policy (provider documentation); the list is empty
+  # by default.
   dynamic "application_rule_collection" {
     for_each = length(var.denied_web_categories) > 0 ? [1] : []
     content {
@@ -237,11 +229,11 @@ resource "azurerm_firewall" "egress" {
 
   tags = local.tags
 
-  # El NAT debe estar en la subnet antes de que el firewall empiece a enrutar.
+  # The NAT Gateway must be on the subnet before the firewall starts routing.
   depends_on = [azurerm_subnet_nat_gateway_association.firewall]
 }
 
-# --- Observabilidad -----------------------------------------------------
+# --- Observability ------------------------------------------------------
 
 resource "azurerm_log_analytics_workspace" "this" {
   name                = "log-vwan-egress"

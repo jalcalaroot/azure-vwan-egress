@@ -1,6 +1,6 @@
-# Conecta app1 al hub: se asocia a rt-spokes (aprende el 0.0.0.0/0 hacia el
-# firewall) y propaga su prefijo a rt-egress (para que el firewall devuelva
-# las respuestas). Ver modules/spoke-connection.
+# Connects app1 to the hub: it associates with rt-spokes (learns the 0.0.0.0/0 route
+# to the firewall) and propagates its prefix to rt-egress (so the firewall can
+# return the replies). See modules/spoke-connection.
 module "app1_connection" {
   source = "./modules/spoke-connection"
 
@@ -10,7 +10,7 @@ module "app1_connection" {
   route_table_spokes_id = azurerm_virtual_hub_route_table.spokes.id
   route_table_egress_id = azurerm_virtual_hub_route_table.egress.id
 
-  # La conexion del egress publica el 0.0.0.0/0; app1 debe conectarse despues
-  # para aprenderlo desde el primer momento.
+  # The egress connection publishes the 0.0.0.0/0 route; app1 connects afterwards so it
+  # learns it from the start.
   depends_on = [azurerm_virtual_hub_connection.egress]
 }

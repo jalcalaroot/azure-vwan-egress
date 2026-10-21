@@ -1,21 +1,19 @@
 # ============================================================================
-# Virtual WAN + hub + tablas de rutas
+# Virtual WAN + hub + route tables
 #
-# Modelo de enrutamiento (estatico, SIN routing intent):
+# Routing model (static, WITHOUT routing intent):
 #
-#   rt-spokes  - asociada a TODAS las VNets de aplicacion. Contiene la ruta
-#                0.0.0.0/0 -> firewall (la inyecta la conexion de egress) y el
-#                prefijo de la VNet de egress. NO contiene los prefijos de los
-#                otros spokes: los spokes no se ven entre si (aislados).
-#   rt-egress  - asociada a la conexion de la VNet de egress. Recibe los
-#                prefijos de TODOS los spokes (para que el firewall sepa
-#                devolver las respuestas).
+#   rt-spokes  - associated with EVERY application VNet. Holds the 0.0.0.0/0 ->
+#                firewall route (injected by the egress connection) and the egress
+#                VNet prefix. It does NOT hold the prefixes of other spokes: spokes
+#                cannot see each other (isolated).
+#   rt-egress  - associated with the egress VNet connection. Receives the prefixes
+#                of ALL spokes (so the firewall can return the replies).
 #
-# Por que no routing intent / secured hub: el NAT Gateway NO esta soportado en
-# el hub de Virtual WAN (ni en AzureFirewallSubnet de un secured hub). Para
-# tener NAT Gateway la salida vive en una VNet "de egress" conectada al hub y
-# el 0.0.0.0/0 se publica como ruta estatica en esa conexion. Ver
-# docs/design.md.
+# Why not routing intent / secured hub: NAT Gateway is NOT supported in a Virtual
+# WAN hub (nor in the AzureFirewallSubnet of a secured hub). To use a NAT Gateway
+# the egress lives in an "egress" VNet connected to the hub, and the 0.0.0.0/0
+# route is published as a static route on that connection. See docs/design.md.
 # ============================================================================
 
 resource "azurerm_virtual_wan" "this" {
@@ -24,8 +22,8 @@ resource "azurerm_virtual_wan" "this" {
   resource_group_name = var.resource_group_name
   type                = "Standard"
 
-  # Spoke-a-spoke y rama-a-VNet los gobiernan las tablas de rutas de arriba,
-  # no el flag global: se deja el comportamiento por defecto de Standard.
+  # Spoke-to-spoke and branch-to-VNet traffic is governed by the route tables above,
+  # not by the global flag: the Standard default behavior is kept.
   allow_branch_to_branch_traffic = true
 
   tags = local.tags
@@ -54,11 +52,11 @@ resource "azurerm_virtual_hub_route_table" "egress" {
   labels         = ["egress"]
 }
 
-# Conexion de la VNet de egress al hub. Es la que publica el 0.0.0.0/0.
-#   - internet_security_enabled = false: segun Microsoft, la conexion que
-#     ANUNCIA el 0.0.0.0/0 no debe recibirlo (evita bucles de ruteo).
-#   - associated = rt-egress; propaga hacia rt-spokes (el 0/0 estatico y el
-#     prefijo de la VNet de egress).
+# Connection of the egress VNet to the hub. It publishes the 0.0.0.0/0 route.
+#   - internet_security_enabled = false: per Microsoft, the connection that
+#     ADVERTISES 0.0.0.0/0 must not receive it (avoids routing loops).
+#   - associated = rt-egress; propagates to rt-spokes (the static 0/0 route and
+#     the egress VNet prefix).
 resource "azurerm_virtual_hub_connection" "egress" {
   name                      = "conn-egress"
   virtual_hub_id            = azurerm_virtual_hub.this.id

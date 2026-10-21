@@ -1,112 +1,87 @@
-# Diseño: salida centralizada a internet con Virtual WAN
+# Design: centralized internet egress with Virtual WAN
 
-## Requisito
+## Requirement
 
-Las VNets de aplicación (estructura de `azure-virtual-network`) no tienen NAT propio: **toda la salida a internet pasa por un punto central de alta disponibilidad** con IPs de salida estables. La **entrada** sigue llegando por las subnets públicas de cada VNet.
+Application VNets have no NAT Gateway of their own. All their internet egress goes through one highly available point with stable outbound IPs, while inbound traffic keeps entering through each VNet's own public subnets.
 
-## Restricción que condiciona el diseño
+## Constraint that shapes the design
 
-El NAT Gateway **no está soportado en el hub de Virtual WAN**, ni en la `AzureFirewallSubnet` de un secured hub (Microsoft lo documenta en *Scale SNAT ports with Azure NAT Gateway*, *Secure your Azure Firewall deployment* y *Troubleshoot NAT gateway*). Un NAT Gateway solo puede asociarse a subnets de una VNet normal conectada al hub.
+A NAT Gateway cannot be placed in a Virtual WAN hub (nor in the `AzureFirewallSubnet` of a secured hub), cannot span virtual networks, and cannot be the next hop of another VNet. It only performs NAT for traffic originating in the subnets it is attached to. Microsoft documents the hub-and-spoke pattern as a forwarder (Azure Firewall or an NVA) in front of the NAT Gateway:
 
-Por eso la salida vive en una **VNet de egress** conectada al hub:
+- [NAT Gateway resource](https://learn.microsoft.com/azure/nat-gateway/nat-gateway-resource) and [FAQ](https://learn.microsoft.com/azure/nat-gateway/faq)
+- [Tutorial: NAT gateway with Azure Firewall in a hub-and-spoke network](https://learn.microsoft.com/azure/nat-gateway/tutorial-hub-spoke-nat-firewall)
+- [Scale SNAT ports with Azure NAT Gateway](https://learn.microsoft.com/azure/firewall/integrate-with-nat-gateway)
 
-| Opción | NAT Gateway | Gestión del firewall | Elegida |
+The egress therefore lives in its own VNet connected to the hub.
+
+| Option | NAT Gateway | Firewall management | Chosen |
 |---|---|---|---|
-| A. Secured hub (Azure Firewall en el hub + routing intent) | **No** (solo IPs públicas del firewall, hasta 80) | Microsoft, rutas automáticas | No |
-| **B. VNet de egress: Azure Firewall + NAT Gateway StandardV2, 0.0.0.0/0 estático en la conexión** | **Sí** | Nosotros (rutas explícitas) | **Sí** |
-| C. Hub-and-spoke clásico con peering (sin vWAN) | Sí | Nosotros | No (se pidió vWAN) |
+| A. Secured hub (Azure Firewall in the hub + routing intent) | No (only firewall public IPs, up to 80) | Microsoft-managed, automatic routes | No |
+| **B. Egress VNet: Azure Firewall + StandardV2 NAT Gateway, static `0.0.0.0/0` on the hub connection** | **Yes** | Explicit routes | **Yes** |
+| C. Classic hub-and-spoke with VNet peering (no Virtual WAN) | Yes | Explicit routes | No |
 
-La opción A es más simple de operar pero no cumple "NAT". Si más adelante se prefiere simplicidad sobre IPs estables y 64.512 puertos SNAT por IP, se puede migrar a A.
+Option A is simpler to operate but gives up the NAT Gateway (stable IPs, 64,512 SNAT ports per IP).
 
-## Arquitectura
+## Routing model
 
-```mermaid
-flowchart LR
-    subgraph SPOKES["VNets de aplicación (sin NAT propio)"]
-        subgraph S1["vnet-app-1 (10.0.0.0/16)"]
-            P1["subnets públicas<br/>public, appgw, apim<br/>ENTRADA + salida directa"]
-            V1["subnets privadas<br/>app, data, aks, privatelink<br/>sin default outbound"]
-        end
-        S2["vnet-app-N (10.N.0.0/16)"]
-    end
+No routing intent. Two custom route tables in the hub:
 
-    subgraph WAN["Virtual WAN (Standard)"]
-        HUB["Virtual hub 10.250.0.0/23<br/>rt-spokes · rt-egress"]
-    end
-
-    subgraph EG["vnet-egress 10.251.0.0/24"]
-        FW["Azure Firewall Standard<br/>3 zonas, política: salida abierta"]
-        NAT["NAT Gateway StandardV2<br/>zona-redundante, IP pública estable"]
-    end
-
-    NET(("Internet"))
-
-    NET == "entrada" ==> P1
-    V1 -- "0.0.0.0/0 aprendido del hub" --> HUB
-    S2 -- "0.0.0.0/0" --> HUB
-    HUB -- "ruta estática 0.0.0.0/0 → IP del firewall" --> FW
-    FW -- "SNAT" --> NAT
-    NAT == "salida" ==> NET
-    P1 -. "salida directa (UDR 0/0 → Internet)" .-> NET
-```
-
-## Enrutamiento (sin routing intent)
-
-Dos tablas de rutas personalizadas en el hub:
-
-| Tabla | La usan (asociadas) | Contiene | Efecto |
+| Route table | Associated with | Contains | Effect |
 |---|---|---|---|
-| `rt-spokes` | todos los spokes | `0.0.0.0/0 → firewall` (estática, publicada por la conexión de egress) + prefijo de la VNet de egress | Los spokes salen por el firewall y **no ven a otros spokes** |
-| `rt-egress` | la conexión de egress | prefijos de todos los spokes (propagados) | El firewall sabe devolver las respuestas |
+| `rt-spokes` | every application VNet | `0.0.0.0/0 → firewall` (published by the egress connection) and the egress VNet prefix | Spokes leave through the firewall and do not see each other |
+| `rt-egress` | the egress connection | the prefix of every spoke (propagated) | The firewall can return the replies |
 
-Detalles de configuración que Microsoft exige y que ya están en el código:
+Settings required by Microsoft ([Securing internet access](https://learn.microsoft.com/azure/virtual-wan/about-internet-routing)):
 
-- La conexión de egress tiene `internet_security_enabled = false` (la conexión que anuncia el 0/0 no debe recibirlo: evita bucles).
-- Las conexiones de los spokes tienen `internet_security_enabled = true` (es lo que hace que aprendan el 0/0).
-- El 0/0 estático **no se propaga entre hubs**: cada hub/región necesita su propia VNet de egress.
-- Los 0/0 en la conexión de egress apuntan a la IP privada del firewall, no a la IP del router del hub.
+- The egress connection has `internet_security_enabled = false` (the connection that advertises `0.0.0.0/0` must not receive it).
+- Spoke connections have `internet_security_enabled = true` (that is what makes them learn `0.0.0.0/0`).
+- The static `0.0.0.0/0` does not propagate between hubs: every hub/region needs its own egress VNet.
+- The static route targets the firewall's private IP, never the hub router IPs.
 
-El firewall además **niega destinos RFC1918** (variable `block_private_destinations`): defensa en profundidad sobre el aislamiento por rutas. Se desactiva cuando haya conectividad híbrida que deba pasar por él.
+## High availability
 
-## Alta disponibilidad
-
-| Componente | Cómo es HA |
+| Component | How |
 |---|---|
-| Virtual hub / router | Gestionado por Microsoft |
-| Azure Firewall | 3 zonas de disponibilidad |
-| NAT Gateway | StandardV2: zona-redundante por diseño (sin `zones`) con IP pública StandardV2 |
+| Virtual hub / router | Microsoft-managed |
+| Azure Firewall | 3 availability zones |
+| NAT Gateway | StandardV2: zone-redundant by design (`zones` omitted), StandardV2 public IP |
 
-No cubre la caída de una región completa (un solo hub). Para DR habría que repetir hub + egress en una segunda región.
+A single hub does not survive a regional outage; disaster recovery would need a second hub and egress VNet in another region.
 
-## VNet de aplicación `app1`
+## Application VNet `app1`
 
-`app1` (10.1.0.0/16) vive en este repo (`app1_*.tf`) y tiene **las mismas 10 capas** que `azure-virtual-network`: public, appgw, app, data, aks, privatelink, containerapps, aks-virtual-nodes, func y apim, cada una con su NSG (`nsg-app1-snet-*`, salida abierta explícita) y los 7 ASG (`asg-app1-*`). Diferencias:
+`app1` (`10.1.0.0/16`) lives in this repository (`app1_*.tf`) and has the same ten layers as the [`azure-virtual-network`](https://github.com/jalcalaroot/azure-virtual-network) VNet — public, appgw, app, data, aks, privatelink, containerapps, aks-virtual-nodes, func and apim — each with its NSG (`nsg-app1-snet-*`, explicit outbound allow) and seven ASGs (`asg-app1-*`).
 
-| | VNet conocida | `app1` |
+| | Known VNet | `app1` |
 |---|---|---|
-| NAT Gateway propio | Sí | **No**: sale por el hub |
-| Salida de las subnets privadas (app, data, aks, privatelink) | NAT Gateway | Ruta 0.0.0.0/0 aprendida del hub (data sigue sin internet: 0/0 → None) |
-| Subnets de entrada (public, appgw, apim) | public con 0/0 → Internet; appgw y apim sin route table | Las tres con route table 0/0 → Internet |
-| Nombres | `nsg-snet-*`, `rt-*`, `asg-*` | sufijo `app1` (un solo resource group compartido) |
+| Own NAT Gateway | Yes | **No**: egress goes through the hub |
+| Private subnets (app, data, aks, privatelink) | NAT Gateway | `0.0.0.0/0` learned from the hub (`data` keeps no internet: `0/0 → None`) |
+| Inbound subnets (public, appgw, apim) | `public` with `0/0 → Internet`; appgw/apim without route table | all three with a `0/0 → Internet` route table |
+| Names | `nsg-snet-*`, `rt-*`, `asg-*` | `app1` suffix (single shared resource group) |
 
-En `snet-app` hay **dos VMs de prueba**, una por zona (`vm-app1-test-z1` y `-z2`, sin IP pública, `Standard_D2as_v4`; los B-series x86 no están disponibles en la suscripción). Las subnets de Azure abarcan todas las zonas ([Reliability in Azure Virtual Network](https://learn.microsoft.com/azure/reliability/reliability-virtual-network)), así que ambas comparten subnet. Si salen a internet, lo hacen solo por app1 → hub → firewall → NAT Gateway.
+`snet-app` hosts two test VMs, one per availability zone (`vm-app1-test-z1`, `vm-app1-test-z2`), without public IP. Azure subnets span every zone ([Reliability in Azure Virtual Network](https://learn.microsoft.com/azure/reliability/reliability-virtual-network)), so both share the subnet. Their internet access can only go through app1 → hub → firewall → NAT Gateway.
 
-## Qué NO hace este repo
+## Firewall
 
-- Solo hay una VNet de aplicación (`app1`); otras se conectan con `modules/spoke-connection` (ver `spoke-contract.md`). El aislamiento entre spokes no se puede probar con una sola.
-- No define DNS privado centralizado (las zonas `privatelink.*` siguen vinculadas por VNet).
-- No filtra por FQDN: la salida del firewall está abierta por un supuesto de diseño (no una decisión explícita del propietario; pendiente de decidir). Para filtrar no basta con añadir reglas de aplicación: las reglas de red se evalúan primero y `allow-all-outbound` las dejaría sin efecto (ver `firewall-review.md`).
-- No incluye CI ni identidades de CI todavía (ver pendientes en `CLAUDE.md`).
+Rules, threat intelligence, DNS proxy and monitoring are described in [firewall.md](firewall.md).
 
-## Costo (precios de lista de Azure Retail Prices, eastus, consultados el 2026-10-19)
+## Scope
 
-| Componente | Precio | Mensual (730 h) |
+- One application VNet (`app1`); more are attached with [`modules/spoke-connection`](../modules/spoke-connection) following [spoke-contract.md](spoke-contract.md). Isolation between spokes needs a second spoke to be exercised.
+- Centralized private DNS is out of scope: `privatelink.*` zones stay linked per VNet.
+- No CI/CD yet.
+
+## Cost
+
+List prices, East US (Azure Retail Prices API):
+
+| Component | Price | Monthly (730 h) |
 |---|---|---|
-| Azure Firewall Standard | US$1,25/h | ~US$912 |
-| Virtual WAN Standard hub | US$0,25/h | ~US$183 |
-| NAT Gateway StandardV2 | US$4/mes | US$4 |
-| IPs públicas (2) y Log Analytics | pocos centavos/h | ~US$10-15 (sin verificar) |
-| VM de prueba D2as_v4 | ~US$0,1/h (sin verificar) | ~US$70 |
-| **Total sin tráfico** | **~US$1,6/h (~US$38/día)** | **~US$1.170** |
+| Azure Firewall Standard | US$1.25/h | ~US$912 |
+| Virtual WAN Standard hub | US$0.25/h | ~US$183 |
+| NAT Gateway StandardV2 | US$4/month | US$4 |
+| Public IPs (2) and Log Analytics | a few cents/h | ~US$10-15 |
+| Two test VMs (`Standard_D2as_v4`) | ~US$0.1/h each | ~US$140 |
+| **Total without traffic** | **~US$1.7/h (~US$40/day)** | **~US$1,250** |
 
-Además se cobra por GB procesado: hub US$0,02/GB; el firewall y el NAT también cobran por GB (el del firewall no se consultó). El firewall es el 80 % del costo. El hub tarda 20-30 min en crearse. Es una POC para levantar, probar y dar de baja el mismo día: unas 3 horas de prueba cuestan ~US$5.
+Data processing is charged per GB on the hub (US$0.02/GB), firewall and NAT Gateway. The firewall is about 70% of the cost; Premium (US$1.75/h) adds IDPS and web categories. The hub takes ~35 minutes to create, so the stack is meant to be deployed on demand.

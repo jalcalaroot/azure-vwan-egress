@@ -1,6 +1,6 @@
-# Variables de la VNet de aplicacion app1: mismas capas (subnets) que la VNet
-# conocida de azure-virtual-network, con address space 10.1.0.0/16 para no
-# solaparse con ninguna otra (ver docs/spoke-contract.md).
+# Variables for the app1 application VNet: the same layers (subnets) as
+# azure-virtual-network, with address space 10.1.0.0/16 so it does not overlap
+# with any other VNet (see docs/spoke-contract.md).
 
 variable "vnet_name" {
   description = "Name of the Virtual Network"
@@ -21,7 +21,7 @@ variable "public_subnet_cidr" {
 }
 
 variable "appgw_subnet_cidr" {
-  description = "CIDR para la subnet dedicada de Application Gateway (unica, no una por AZ)"
+  description = "CIDR block for the dedicated Application Gateway subnet (a single subnet, not one per zone)"
   type        = string
   default     = "10.1.40.0/24"
 }
@@ -39,31 +39,31 @@ variable "data_subnet_cidr" {
 }
 
 variable "aks_subnet_cidr" {
-  description = "CIDR para la subnet dedicada de AKS (unica, no una por AZ - HA se maneja via zones del node pool)"
+  description = "CIDR block for the dedicated AKS subnet (a single subnet, not one per zone - high availability comes from the node pool zones)"
   type        = string
   default     = "10.1.60.0/24"
 }
 
 variable "containerapps_subnet_cidr" {
-  description = "CIDR para la subnet delegada a Microsoft.App/environments (azure-container-apps)"
+  description = "CIDR block for the subnet delegated to Microsoft.App/environments (Container Apps)"
   type        = string
   default     = "10.1.70.0/23"
 }
 
 variable "aks_virtual_nodes_subnet_cidr" {
-  description = "CIDR para la subnet delegada a Microsoft.ContainerInstance/containerGroups (AKS Virtual Nodes, azure-aks-cluster)"
+  description = "CIDR block for the subnet delegated to Microsoft.ContainerInstance/containerGroups (AKS virtual nodes)"
   type        = string
   default     = "10.1.72.0/24"
 }
 
 variable "func_subnet_cidr" {
-  description = "CIDR para la subnet delegada a Microsoft.App/environments (VNet integration outbound de Function Apps en plan Flex Consumption - azure-agent-platform)"
+  description = "CIDR block for the subnet delegated to Microsoft.App/environments (outbound VNet integration of Flex Consumption Function Apps)"
   type        = string
   default     = "10.1.73.0/24"
 }
 
 variable "apim_subnet_cidr" {
-  description = "CIDR para la subnet de API Management en modo VNet External (azure-agent-platform). Sin delegation - APIM la prohibe. Minimo /29, un /24 deja margen."
+  description = "CIDR block for the API Management subnet in VNet External mode. No delegation (APIM forbids it). Minimum /29; a /24 leaves headroom."
   type        = string
   default     = "10.1.74.0/24"
 }

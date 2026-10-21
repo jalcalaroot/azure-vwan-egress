@@ -1,8 +1,8 @@
-# Conecta una VNet de aplicacion al hub con el modelo de rutas de este
-# proyecto: se asocia a rt-spokes (recibe el 0.0.0.0/0 y NO ve a otros
-# spokes) y propaga su prefijo a rt-egress (para que el firewall devuelva las
-# respuestas). internet_security_enabled = true es lo que hace que la VNet
-# "aprenda" el 0.0.0.0/0.
+# Connects an application VNet to the hub using this project's routing model: it
+# associates with rt-spokes (receives the 0.0.0.0/0 route and does NOT see other
+# spokes) and propagates its prefix to rt-egress (so the firewall can return the
+# replies). internet_security_enabled = true is what makes the VNet learn the
+# 0.0.0.0/0 route.
 resource "azurerm_virtual_hub_connection" "this" {
   name                      = var.name
   virtual_hub_id            = var.virtual_hub_id

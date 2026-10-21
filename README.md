@@ -1,6 +1,6 @@
 # azure-vwan-egress
 
-Centralized internet egress for application VNets using **Azure Virtual WAN**: every private subnet leaves through one Azure Firewall behind a zone-redundant **NAT Gateway (StandardV2)**, while inbound traffic keeps entering through each VNet's own public subnets. Includes `app1`, a VNet with the same layers as [`azure-virtual-network`](https://github.com/jalcalaroot/azure-virtual-network) but no NAT of its own, and a test VM per availability zone. Standalone Terraform project — own backend, own state.
+Centralized internet egress for application VNets using **Azure Virtual WAN**: every private subnet leaves through one Azure Firewall behind a zone-redundant **NAT Gateway (StandardV2)**, while inbound traffic keeps entering through each VNet's own public subnets. Includes `app1`, a VNet with the same layers as [`azure-virtual-network`](https://github.com/jalcalaroot/azure-virtual-network) but no NAT of its own, with a test VM per availability zone. Standalone Terraform project — own backend, own state.
 
 ## Architecture
 
@@ -100,4 +100,4 @@ done
 
 ## Cost
 
-About US$1.6 per hour (~US$38 per day) while deployed, 80% of it the firewall. Meant to be deployed, tested and destroyed the same day. More detail, the firewall review and the test evidence are in [`docs/`](docs/).
+About US$1.7 per hour (~US$40 per day) while deployed, ~70% of it the firewall. Details, the firewall configuration and the validation results are in [`docs/`](docs/).

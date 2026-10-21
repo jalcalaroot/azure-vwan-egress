@@ -1,37 +1,31 @@
-# VNet de aplicacion "app1": las MISMAS capas (10 subnets, NSG por subnet con
-# salida abierta explicita, ASGs) que azure-virtual-network, con tres
-# diferencias para usar la salida central de Virtual WAN:
-#   1. No tiene NAT Gateway propio. Las subnets privadas (app, data, aks,
-#      privatelink) mantienen default_outbound_access_enabled = false y salen
-#      por la ruta 0.0.0.0/0 que aprenden del hub.
-#   2. Las subnets por donde ENTRA trafico desde internet (public, appgw, apim)
-#      llevan una route table 0.0.0.0/0 -> Internet para que la respuesta
-#      salga simetrica por donde entro (y porque Application Gateway v2 lo exige).
-#   3. Se conecta al hub con modules/spoke-connection (ver app1_connection.tf).
-# Los recursos llevan el sufijo "app1" porque la cuenta usa un unico resource
-# group compartido y los nombres no deben chocar con otras VNets.
+# Application VNet "app1": the same ten layers (subnets, one NSG per subnet with an
+# explicit outbound allow, ASGs) as azure-virtual-network, adapted to the central
+# Virtual WAN egress:
+#   1. No NAT Gateway of its own. The private subnets (app, data, aks,
+#      privatelink) keep default_outbound_access_enabled = false and leave
+#      through the 0.0.0.0/0 route learned from the hub.
+#   2. The subnets that receive internet traffic (public, appgw, apim) use a
+#      0.0.0.0/0 -> Internet route table, so replies leave symmetrically
+#      (Application Gateway v2 also requires it).
+#   3. The VNet connects to the hub through modules/spoke-connection
+#      (see app1_connection.tf).
+# Resource names carry the "app1" suffix because the account uses a single
+# shared resource group and names must not collide with other VNets.
 #
-# parent_id del modulo AVM quiere el ID del resource group, no el nombre.
+# The AVM module's parent_id takes the resource group ID, not its name.
 data "azurerm_resource_group" "this" {
   name = var.resource_group_name
 }
 
-# Revision 2026-10-16 - segmentacion lateral: las reglas "Allow-VNet-Inbound"
-# (origen VirtualNetwork = cualquier recurso de la VNet) se reemplazaron por
-# origenes concretos. Se usan CIDR de subnet y no ASG porque cada subnet aloja
-# un solo rol (el CIDR equivale al rol) y los llamadores principales (APIM,
-# Function, Container Apps) no pueden pertenecer a un ASG. Si se quiere un
-# modelo "tipo Security Group", el provider SI admite ASG en Private
-# Endpoints y en los node pools de AKS (no en Container Apps, Function ni
-# APIM). Los flujos permitidos son los previstos por el diseno; deben
-# validarse al desplegar con los repos consumidores.
 # ============================================================================
-# Network Security Groups - una por subnet, mismas reglas que antes de esta
-# migracion (nada cambia a nivel de seguridad real).
+# Network Security Groups - one per subnet. Lateral rules use subnet CIDRs
+# (each subnet hosts a single role) rather than ASGs, because the main callers
+# (APIM, Function, Container Apps) cannot be ASG members. The provider does
+# support ASGs on Private Endpoints and AKS node pools, used below.
 # ============================================================================
 
 resource "azurerm_network_security_group" "public" {
-  #checkov:skip=CKV_AZURE_160:80 se mantiene por diseño para el redirect HTTP->HTTPS que hace App Gateway - el trafico plano no llega a los backends, App Gateway lo redirige antes.
+  #checkov:skip=CKV_AZURE_160:Port 80 is kept by design for the HTTP->HTTPS redirect done by Application Gateway - plain traffic never reaches the backends.
   name                = "nsg-app1-snet-public"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -70,8 +64,7 @@ resource "azurerm_network_security_group" "public" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -86,7 +79,7 @@ resource "azurerm_network_security_group" "public" {
 }
 
 resource "azurerm_network_security_group" "appgw" {
-  #checkov:skip=CKV_AZURE_160:80 se mantiene por diseño para el redirect HTTP->HTTPS que hace App Gateway - mismo motivo que nsg-snet-public.
+  #checkov:skip=CKV_AZURE_160:Port 80 is kept by design for the Application Gateway HTTP->HTTPS redirect - same reason as nsg-app1-snet-public.
   name                = "nsg-app1-snet-appgw"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -147,8 +140,7 @@ resource "azurerm_network_security_group" "appgw" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -179,7 +171,7 @@ resource "azurerm_network_security_group" "private" {
     source_address_prefixes    = [var.public_subnet_cidr, var.appgw_subnet_cidr]
     destination_address_prefix = "VirtualNetwork"
   }
-  # Antes: Allow-VNet-Inbound (toda la VNet). Ahora solo la propia subnet; los llamadores externos entran por Allow-From-Public-Subnets.
+  # Only the subnet itself; external callers enter through Allow-From-Public-Subnets.
   security_rule {
     name                       = "Allow-Intra-Subnet"
     priority                   = 200
@@ -202,8 +194,7 @@ resource "azurerm_network_security_group" "private" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -256,8 +247,7 @@ resource "azurerm_network_security_group" "data" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -288,7 +278,7 @@ resource "azurerm_network_security_group" "aks" {
     source_address_prefix      = "AzureLoadBalancer"
     destination_address_prefix = "*"
   }
-  # Antes: Allow-VNet-Inbound. Ahora: nodos, nodos virtuales (ACI) y App Gateway (AGIC).
+  # Nodes, virtual nodes (ACI) and Application Gateway (AGIC).
   security_rule {
     name                       = "Allow-AKS-Internal-And-AppGateway"
     priority                   = 200
@@ -311,8 +301,7 @@ resource "azurerm_network_security_group" "aks" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -343,12 +332,10 @@ resource "azurerm_network_security_group" "privatelink" {
     source_address_prefixes    = [var.app_subnet_cidr, var.data_subnet_cidr]
     destination_address_prefix = "VirtualNetwork"
   }
-  # Revision 2026-10-16: con las politicas de red de la subnet activadas este
-  # NSG se aplica a la NIC de cada Private Endpoint. Una regla por servicio,
-  # con el ASG del servicio como destino (443). Prioridades con saltos de 100.
-  # La regla 100 de arriba (app y data hacia cualquier endpoint) se mantiene
-  # como respaldo del nivel de aplicacion y de datos.
-  # APIM llega solo a la Function App.
+  # With subnet network policies enabled, this NSG applies to each Private Endpoint NIC.
+  # One rule per service, with the service ASG as destination (443); priorities in
+  # steps of 100. Rule 100 above (app and data to any endpoint) is the baseline for
+  # the application and data tiers. APIM reaches only the Function App.
   security_rule {
     name                                       = "Allow-Apim-To-Function"
     priority                                   = 200
@@ -360,7 +347,7 @@ resource "azurerm_network_security_group" "privatelink" {
     source_address_prefixes                    = [var.apim_subnet_cidr]
     destination_application_security_group_ids = [azurerm_application_security_group.this["function"].id]
   }
-  # La Function llega a Cosmos DB.
+  # The Function reaches Cosmos DB.
   security_rule {
     name                                       = "Allow-Func-To-Cosmos"
     priority                                   = 300
@@ -372,7 +359,7 @@ resource "azurerm_network_security_group" "privatelink" {
     source_address_prefixes                    = [var.func_subnet_cidr]
     destination_application_security_group_ids = [azurerm_application_security_group.this["cosmos"].id]
   }
-  # La Function llega al storage (host y estado de Durable Functions).
+  # The Function reaches storage (host and Durable Functions state).
   security_rule {
     name                                       = "Allow-Func-To-Storage"
     priority                                   = 400
@@ -384,7 +371,7 @@ resource "azurerm_network_security_group" "privatelink" {
     source_address_prefixes                    = [var.func_subnet_cidr]
     destination_application_security_group_ids = [azurerm_application_security_group.this["storage"].id]
   }
-  # La Function llega a AI Foundry (embeddings y chat).
+  # The Function reaches AI Foundry (embeddings and chat).
   security_rule {
     name                                       = "Allow-Func-To-AIFoundry"
     priority                                   = 500
@@ -396,7 +383,7 @@ resource "azurerm_network_security_group" "privatelink" {
     source_address_prefixes                    = [var.func_subnet_cidr]
     destination_application_security_group_ids = [azurerm_application_security_group.this["ai-foundry"].id]
   }
-  # La Function llega a Content Safety.
+  # The Function reaches Content Safety.
   security_rule {
     name                                       = "Allow-Func-To-ContentSafety"
     priority                                   = 600
@@ -408,7 +395,7 @@ resource "azurerm_network_security_group" "privatelink" {
     source_address_prefixes                    = [var.func_subnet_cidr]
     destination_application_security_group_ids = [azurerm_application_security_group.this["content-safety"].id]
   }
-  # Container Apps y AKS llegan a Key Vault (certificados y secretos).
+  # Container Apps and AKS reach Key Vault (certificates and secrets).
   security_rule {
     name                                       = "Allow-Apps-To-KeyVault"
     priority                                   = 700
@@ -431,8 +418,7 @@ resource "azurerm_network_security_group" "privatelink" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -446,13 +432,7 @@ resource "azurerm_network_security_group" "privatelink" {
   }
 }
 
-# containerapps/aks_virtual_nodes: hasta 2026-09-29 vivian como bolt-ons
-# fuera de este modulo (en el repo consumidor), para no forzar un bump de
-# version del modulo por una necesidad puntual de un solo proyecto. Al
-# convertir este repo de "modulo versionado por git tag" a proyecto
-# standalone (ver CLAUDE.md), esa razon dejo de aplicar - un cambio aca ya
-# no tiene otros consumidores a los que romper, asi que se unificaron en el
-# mismo mapa subnets de abajo, igual que public/appgw/app/data/aks/privatelink.
+# The containerapps and aks_virtual_nodes subnets are managed together with the other layers.
 resource "azurerm_network_security_group" "containerapps" {
   name                = "nsg-app1-snet-containerapps"
   location            = var.location
@@ -470,9 +450,8 @@ resource "azurerm_network_security_group" "containerapps" {
     source_address_prefix      = "AzureLoadBalancer"
     destination_address_prefix = "*"
   }
-  # Container Apps Environment (azure-container-apps) es internal-only a
-  # proposito - todo el trafico entrante real pasa por snet-appgw, nunca
-  # directo a este subnet.
+  # The Container Apps Environment is internal-only: all real inbound traffic goes through
+  # snet-appgw, never directly to this subnet.
   security_rule {
     name                       = "Allow-AppGateway-To-Edge-Proxy"
     priority                   = 200
@@ -484,7 +463,7 @@ resource "azurerm_network_security_group" "containerapps" {
     source_address_prefix      = var.appgw_subnet_cidr
     destination_address_prefix = "*"
   }
-  # Antes: Allow-VNet-Inbound. App Gateway ya tiene su regla propia arriba.
+  # Application Gateway has its own rule above.
   security_rule {
     name                       = "Allow-Intra-Subnet"
     priority                   = 300
@@ -507,8 +486,7 @@ resource "azurerm_network_security_group" "containerapps" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -528,7 +506,7 @@ resource "azurerm_network_security_group" "aks_virtual_nodes" {
   resource_group_name = var.resource_group_name
   tags                = local.tags
 
-  # Antes: Allow-VNet-Inbound. Ahora solo AKS y la propia subnet.
+  # Only AKS and the subnet itself.
   security_rule {
     name                       = "Allow-AKS-And-Intra-Subnet"
     priority                   = 100
@@ -551,8 +529,7 @@ resource "azurerm_network_security_group" "aks_virtual_nodes" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -566,19 +543,17 @@ resource "azurerm_network_security_group" "aks_virtual_nodes" {
   }
 }
 
-# Agregada 2026-09-30: ningun subnet existente hasta ahora tenia delegation
-# a Microsoft.App/environments (corregido 2026-10-03, ver abajo) - gap real encontrado escribiendo
-# azure-agent-platform (Function App Flex Consumption, VNet integration
-# outbound), cada subnet solo admite UNA delegation asi que ni privatelink
-# ni appgw sirven. Mismo patron minimo que aks_virtual_nodes (subnet
-# delegada, sin trafico inbound iniciado desde afuera de la VNet).
+# Outbound VNet-integration subnet for the Function App (Flex Consumption). A subnet
+# admits a single delegation, so it cannot be shared with privatelink or appgw. Same
+# minimal pattern as aks_virtual_nodes: a delegated subnet with no inbound traffic
+# initiated from outside the VNet.
 resource "azurerm_network_security_group" "func" {
   name                = "nsg-app1-snet-func"
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = local.tags
 
-  # Antes: Allow-VNet-Inbound. La subnet es de integracion saliente: nadie de la VNet debe iniciar trafico hacia ella.
+  # Outbound-integration subnet: nothing in the VNet should initiate traffic to it.
   security_rule {
     name                       = "Allow-Intra-Subnet"
     priority                   = 100
@@ -601,8 +576,7 @@ resource "azurerm_network_security_group" "func" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -616,23 +590,17 @@ resource "azurerm_network_security_group" "func" {
   }
 }
 
-# Agregada 2026-10-03 para API Management (tier Developer) en modo VNet
-# External (azure-agent-platform): el gateway queda publico y llega a los
-# backends privados (Function App por Private Endpoint). La subnet de APIM
-# NO puede tener delegation (doc de Microsoft: "shouldn't have any
-# delegations enabled") y exige un NSG con estas reglas minimas de entrada.
-# El outbound (Storage, SQL, Key Vault, Azure Monitor, Entra ID) lo cubre el
-# allow-all por defecto de Azure, mismo criterio que el resto de NSGs de este
-# archivo, que no definen reglas de salida.
+# API Management (Developer tier) in VNet External mode: the gateway is public and
+# reaches the private backends (Function App through a Private Endpoint). The APIM
+# subnet cannot have a delegation (Microsoft docs: "shouldn't have any delegations
+# enabled") and requires an NSG with these minimum inbound rules. Outbound (Storage,
+# SQL, Key Vault, Azure Monitor, Entra ID) is covered by the explicit allow below.
 #
-# SIN Deny-All-Inbound a proposito (a diferencia del resto de NSGs de este
-# archivo): un deny explicito en 4096 anula las reglas por defecto de Azure
-# AllowVnetInBound/AllowAzureLoadBalancerInBound, que la plataforma de APIM
-# necesita (health probes del load balancer interno, trafico entre nodos).
-# Dos activaciones seguidas fallaron con ActivationFailed con ese deny
-# puesto, aunque la doc dice que AzureLoadBalancer:6390 "no se requiere" en
-# Developer. Internet sigue bloqueado por la regla por defecto
-# DenyAllInbound (65500) salvo el 443 permitido arriba.
+# No Deny-All-Inbound on purpose (unlike the other NSGs in this file): an explicit
+# deny at 4096 overrides Azure's default AllowVnetInBound / AllowAzureLoadBalancerInBound
+# rules, which the APIM platform needs (internal load balancer health probes and
+# node-to-node traffic); activation failed with the deny in place. Internet stays
+# blocked by the default DenyAllInbound (65500) except for 443, allowed above.
 resource "azurerm_network_security_group" "apim" {
   name                = "nsg-app1-snet-apim"
   location            = var.location
@@ -661,8 +629,7 @@ resource "azurerm_network_security_group" "apim" {
     source_address_prefix      = "ApiManagement"
     destination_address_prefix = "VirtualNetwork"
   }
-  # Salida abierta de forma explicita (decision del proyecto): equivale a la
-  # regla de salida de una NACL; antes dependia de la regla por defecto 65001.
+  # Explicit outbound allow, equivalent to an NACL egress rule (without it only the default rule 65001 applies).
   security_rule {
     name                       = "Allow-All-Outbound"
     priority                   = 100
@@ -677,10 +644,10 @@ resource "azurerm_network_security_group" "apim" {
 }
 
 # ============================================================================
-# Route tables - solo donde hace falta desviar del ruteo default de Azure.
-# public/appgw/apim: salida directa a Internet (son las subnets de ENTRADA).
-# data: sin internet (0/0 -> None). El resto no lleva UDR y aprende el 0/0
-# del hub (Virtual WAN) con bgp_route_propagation_enabled = true.
+# Route tables - only where the default Azure routing must be overridden.
+# public/appgw/apim: direct internet (these are the INBOUND subnets).
+# data: no internet (0/0 -> None). The rest have no UDR and learn the 0/0 route
+# from the Virtual WAN hub (bgp_route_propagation_enabled = true).
 # ============================================================================
 
 resource "azurerm_route_table" "public" {
@@ -764,11 +731,11 @@ resource "azurerm_route_table" "containerapps" {
 }
 
 # ============================================================================
-# VNet + subnets via Azure Verified Module.
+# VNet + subnets via Azure Verified Module
 # ============================================================================
 
 module "vnet" {
-  #checkov:skip=CKV_TF_1:pinned por version semver del Terraform Registry (no un git tag movible) - Azure Verified Module oficial, publicado por Microsoft, versiones inmutables una vez publicadas en el registry.
+  #checkov:skip=CKV_TF_1:Pinned by semver from the Terraform Registry (not a movable git tag) - official Azure Verified Module published by Microsoft; versions are immutable once published.
   source  = "Azure/avm-res-network-virtualnetwork/azurerm"
   version = "0.22.2"
 

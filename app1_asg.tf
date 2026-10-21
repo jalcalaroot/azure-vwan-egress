@@ -1,19 +1,18 @@
-# Application Security Groups, uno por servicio (nombre: asg-<servicio>).
+# Application Security Groups, one per service (named asg-app1-<service>).
 #
-# Revision 2026-10-16. Un ASG agrupa las NIC de un mismo servicio para que las
-# reglas de un NSG hablen de roles y no de rangos de IP. Se usan como DESTINO:
-# los llamadores principales (APIM, Function, Container Apps) no pueden ser
-# miembros de un ASG, asi que el ORIGEN de esas reglas sigue siendo el CIDR de
-# su subnet.
+# An ASG groups the NICs of one service so NSG rules talk about roles instead of
+# IP ranges. They are used as DESTINATION: the main callers (APIM, Function,
+# Container Apps) cannot be ASG members, so the SOURCE of those rules remains the
+# CIDR of their subnet.
 #
-# Si un recurso NO se asocia a su ASG, las reglas que apuntan a ese ASG no le
-# llegan y su trafico queda bloqueado en silencio. Los repos consumidores deben
-# asociar sus Private Endpoints / node pools con los IDs del output
-# `application_security_group_ids`.
+# A resource that is NOT associated with its ASG is not reached by the rules that
+# target that ASG, and its traffic is silently blocked. Consumers must associate
+# their Private Endpoints / node pools with the IDs of the
+# `application_security_group_ids` output.
 #
-# Sin ASG (no pueden pertenecer a uno): API Management, integracion de salida
-# de la Function App, Container Apps, Application Gateway, NAT Gateway y
-# Application Insights.
+# Without ASG (they cannot belong to one): API Management, Function App outbound
+# integration, Container Apps, Application Gateway, NAT Gateway and Application
+# Insights.
 
 locals {
   application_security_groups = {

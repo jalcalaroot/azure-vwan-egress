@@ -1,24 +1,24 @@
-# Contrato para las VNets de aplicación (spokes)
+# Contract for application VNets (spokes)
 
-Para usar la salida central, una VNet con la estructura de `azure-virtual-network` debe cumplir lo siguiente. **Estos cambios aún no están aplicados en ese repo** (ver `CLAUDE.md`).
+What a VNet with the layered structure of [`azure-virtual-network`](https://github.com/jalcalaroot/azure-virtual-network) must do to use the central egress. `app1` already follows it (`app1_*.tf`).
 
-## 1. Direccionamiento único
+## 1. Unique address space
 
-Cada VNet conectada necesita un address space propio y sin solapes con el hub (`10.250.0.0/23`), la VNet de egress (`10.251.0.0/24`) ni otros spokes. Virtual WAN no enruta prefijos duplicados.
+Every connected VNet needs its own address space, with no overlap with the hub (`10.250.0.0/23`), the egress VNet (`10.251.0.0/24`) or other spokes. Virtual WAN does not route duplicate prefixes.
 
 | VNet | Address space |
 |---|---|
-| `vnet-jalcalaroot` (hoy, `azure-virtual-network`) | 10.0.0.0/16 |
-| siguiente spoke | 10.1.0.0/16 |
-| siguiente | 10.2.0.0/16 |
+| `vnet-jalcalaroot` (`azure-virtual-network`) | `10.0.0.0/16` |
+| `vnet-app1` | `10.1.0.0/16` |
+| next spoke | `10.2.0.0/16` |
 
-`spoke_address_space` (`10.0.0.0/13`) cubre de 10.0.0.0 a 10.7.255.255; ampliarlo si se necesitan más.
+`spoke_address_space` (`10.0.0.0/13`) covers `10.0.0.0`–`10.7.255.255`; widen it if more are needed.
 
-## 2. Quitar el NAT propio
+## 2. No NAT Gateway of its own
 
-Eliminar `azurerm_nat_gateway`, su IP pública y sus asociaciones del repo del spoke. Las subnets privadas (`app`, `data`, `aks`, `privatelink`) mantienen `default_outbound_access_enabled = false`: su salida pasa a ser la ruta 0/0 que aprenden del hub, sin UDR.
+Remove the NAT Gateway, its public IP and associations. The private subnets (`app`, `data`, `aks`, `privatelink`) keep `default_outbound_access_enabled = false`; their egress is the `0.0.0.0/0` route learned from the hub, with no UDR.
 
-## 3. Conectar la VNet al hub
+## 3. Connect the VNet to the hub
 
 ```hcl
 module "vwan_connection" {
@@ -32,33 +32,33 @@ module "vwan_connection" {
 }
 ```
 
-Los tres IDs son outputs de este repo (`virtual_hub_id`, `route_table_spokes_id`, `route_table_egress_id`).
+The three IDs are outputs of this project (`virtual_hub_id`, `route_table_spokes_id`, `route_table_egress_id`).
 
-## 4. Subnets de entrada: salida directa (route table con 0.0.0.0/0 → Internet)
+## 4. Inbound subnets keep direct egress
 
-Las subnets por las que **entra** tráfico desde internet deben seguir saliendo directo, o las respuestas volverían por el firewall (ruta asimétrica) y se romperían las conexiones entrantes:
+Subnets that receive traffic from the internet need a route table with `0.0.0.0/0 → Internet`; otherwise replies would go through the firewall (asymmetric routing) and inbound connections would break:
 
-| Subnet | Motivo |
+| Subnet | Reason |
 |---|---|
-| `public` | Entrada por IP pública / balanceador |
-| `appgw` | Application Gateway v2 **exige** 0.0.0.0/0 → Internet |
-| `apim` | APIM con gateway público: respuesta simétrica y endpoints de gestión |
+| `public` | Inbound through public IP / load balancer |
+| `appgw` | Application Gateway v2 requires `0.0.0.0/0 → Internet` |
+| `apim` | Public APIM gateway: symmetric replies and management endpoints |
 
-Asociar a cada una una route table con `0.0.0.0/0 → Internet`. Una UDR gana sobre la ruta aprendida del hub. Consecuencia: **la salida de lo que viva en esas subnets no es central** (usa su IP pública / default outbound). Si se quiere centralizar también esa salida, hay que hacer entrar el tráfico por el firewall (DNAT), que es otro diseño.
+A UDR overrides the route learned from the hub. Consequently, **egress from resources in those subnets is not centralized**: it uses their own public IP or default outbound access. Centralizing it too would require inbound traffic to enter through the firewall (DNAT), which is a different design.
 
-## 5. Si una subnet privada lleva su propia route table
+## 5. Subnets with their own route table
 
-La opción **"Propagate gateway routes" debe quedar en `true`**; si está en `false`, Virtual WAN no puede inyectar el 0/0 y la subnet se queda sin salida.
+"Propagate gateway routes" must stay `true`; otherwise Virtual WAN cannot inject the `0.0.0.0/0` route and the subnet loses its egress.
 
-## 6. Servicios que hay que verificar al desplegar (no confirmados)
+## 6. Services to verify when deployed
 
-| Servicio | Duda |
+| Service | Consideration |
 |---|---|
-| AKS | `outbound_type`: `userDefinedRouting` (la salida va por la ruta de la subnet) en lugar de `loadBalancer`, que crearía una IP de salida propia y saltaría el hub. Comprobar si AKS acepta la ruta aprendida de vWAN sin una UDR explícita. |
-| Container Apps | El entorno debe ser de perfiles de carga de trabajo para soportar UDR/rutas propias. |
-| Function App (integración VNet) | Con "route all" su salida pasa por el hub; con la opción por defecto no. |
-| Private endpoints | Siguen locales a cada spoke (misma VNet); no dependen del hub. |
+| AKS | `outbound_type = userDefinedRouting` (egress follows the subnet route) instead of `loadBalancer`, which would create its own egress IP and bypass the hub. Check that AKS accepts the vWAN-learned route without an explicit UDR |
+| Container Apps | The environment must use workload profiles to support UDR/custom routes |
+| Function App (VNet integration) | With "route all" its egress goes through the hub; with the default option it does not |
+| Private endpoints | Stay local to each spoke; they do not depend on the hub |
 
-## 7. Qué no cambia
+## 7. Unchanged
 
-NSGs con salida abierta, ASGs, contrato de puertos y reglas por subnet de `azure-virtual-network` siguen igual. El NSG de `nsg-snet-*` sigue evaluando la salida antes de que el tráfico llegue al hub.
+NSGs with explicit outbound allow, ASGs, the port contract and the per-subnet rules of `azure-virtual-network` stay as they are. The subnet NSG still evaluates outbound traffic before it reaches the hub.

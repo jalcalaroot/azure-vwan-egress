@@ -1,51 +1,36 @@
 # azure-vwan-egress
 
-Salida centralizada a internet con Virtual WAN. Diseño y razones en `docs/design.md`; lo que deben cumplir las VNets de aplicación en `docs/spoke-contract.md`.
+Centralized internet egress with Azure Virtual WAN. The design and its reasoning are in `docs/design.md`; firewall details in `docs/firewall.md`; what application VNets must do to use the egress in `docs/spoke-contract.md`; test results in `docs/validation.md`.
 
-## Reglas del propietario
+## Working conventions
 
-- Salida de los **NSG** abierta: decisión del propietario ("la salida debe estar abierta").
-- Salida del **firewall** abierta (sin filtrado por dominio ni categoría): **supuesto mío, no una decisión del propietario**. Está pendiente decidir si el firewall debe filtrar. No cerrarla sin que lo pida.
-- La inteligencia de amenazas en `Deny` solo bloquea destinos maliciosos conocidos y fue aprobada por el propietario (2026-10-21).
-- Mostrar cada comando y esperar confirmación antes de crear o modificar recursos en la nube.
-- Sin IDs reales (suscripción, tenant, cuentas) ni correos en archivos versionados: marcadores como `<SUBSCRIPTION_ID>`.
-- Los commits usan el correo noreply de GitHub.
+- Show each command and wait for confirmation before creating or changing cloud resources.
+- No real identifiers (subscription, tenant, account IDs) or e-mail addresses in versioned files: use placeholders such as `<SUBSCRIPTION_ID>`.
+- Commits use the GitHub noreply address.
+- NSG egress is open by design (`Allow-All-Outbound`). The firewall policy is also open for outbound traffic: web traffic is allowed to any domain and logged by domain; any restriction must be requested explicitly.
 
-## Cuenta
+## Key facts (verified against Microsoft documentation)
 
-- Los B-series x86 (B1s, B2s...) están `NotAvailableForSubscription` en eastus; la VM de prueba usa `Standard_D2as_v4` (cuota 10).
-- Un solo resource group compartido: los recursos de `app1` llevan sufijo `app1` para no chocar con otras VNets.
+- A NAT Gateway is not supported in a Virtual WAN hub or secured hub, cannot span VNets and cannot be the next hop of another VNet, hence `vnet-egress`.
+- StandardV2 NAT Gateway: no `zones`; its public IP must be StandardV2 (`# tflint-ignore: azurerm_public_ip_invalid_sku`).
+- The firewall needs its own Standard public IP even though egress leaves through the NAT Gateway.
+- The connection that advertises `0.0.0.0/0` has `internet_security_enabled = false`; spoke connections use `true`.
+- `0.0.0.0/0` does not propagate between hubs.
+- Network rules are evaluated before application rules; a network rule covering 80/443 would make the application rules unreachable.
+- x86 B-series VM sizes are not available in this subscription (`NotAvailableForSubscription`); the test VMs use `Standard_D2as_v4`.
+- A single shared resource group is used, so `app1` resources carry the `app1` suffix.
+- The firewall keeps explicit `zones = ["1","2","3"]` (valid and zone-redundant; Microsoft recommends omitting `zones` on new firewalls).
 
-## Decisiones
+## Status
 
-- El firewall mantiene `zones = ["1","2","3"]` explícito (válido y zona-redundante). Microsoft recomienda omitir `zones` en firewalls nuevos, pero el propietario decidió dejarlo así (2026-10-21).
+Deployed and validated (see `docs/validation.md`). Cost while deployed is about US$1.7/hour, so it is created on demand and destroyed afterwards; the hub takes ~35 minutes.
 
-## Hechos clave (verificados en la documentación de Microsoft)
+## Backlog
 
-- El NAT Gateway no está soportado en el hub de vWAN ni en el secured hub; por eso existe `vnet-egress`.
-- NAT Gateway StandardV2: sin `zones`; su IP pública debe ser StandardV2 (`# tflint-ignore: azurerm_public_ip_invalid_sku`).
-- El firewall necesita su propia IP pública Standard aunque la salida use el NAT.
-- La conexión que anuncia el 0/0 lleva `internet_security_enabled = false`; las de los spokes `true`.
-- El 0/0 no se propaga entre hubs.
-
-## Estado
-
-Desplegado y probado el 2026-10-19; **destruido** el mismo día (Azure verificado en 0). Evidencia en `docs/evidencia.md`. Para volver a probar: `terraform apply` (~35 min por el hub, ~US$1,6/h) y destruir al terminar.
-
-## Validado
-
-`terraform validate`, `tflint`, `plan` (57 recursos) y despliegue real: las 2 VMs de `app1` (zonas 1 y 2) salen a internet con la IP del NAT Gateway pasando por el firewall (logs `Allow`). Pendiente de explicar: cuelgues puntuales en los primeros minutos desde la zona 2 (ver evidencia).
-
-## Pendiente
-
-- Revisión del firewall hecha el 2026-10-21 (ver `docs/firewall-review.md`): inteligencia de amenazas en `Deny` y DNS proxy activado en la política; policy analytics activado en la política; falta probar `app1_dns_via_firewall` y añadir alertas.
-- Reglas por dominio añadidas el 2026-10-21 (sin desplegar): al desplegar, verificar HTTPS sin SNI, QUIC y los logs `AZFWApplicationRule` (ver `docs/firewall-review.md`). `denied_web_categories` queda vacío hasta que se decida Premium.
-- Probar el aislamiento entre spokes: hace falta un segundo spoke (solo hay `app1`).
-- Opcional: repetir la prueba desde los primeros minutos tras el despliegue para entender los cuelgues puntuales de la zona 2 (el firewall y la salida funcionaron; no se vio relación con el firewall).
-- Probar la entrada por las subnets públicas (appgw/balanceador) y AKS/Container Apps/Function dentro de `app1`.
-- `app1` ya aplica el contrato (`app1_*.tf`); el repo `azure-virtual-network` NO se usará ni se modifica.
-- (histórico) Aplicar el contrato en `azure-virtual-network` (quitar NAT, route tables de las subnets de entrada, conexión al hub, address space único) y en los consumidores (AKS `outbound_type`).
-- CI: workflows plan/apply e identidades. **Los permisos de CI deben vivir en un root persistente separado** (lección de `azure-virtual-network`: al destruir la VNet se perdían los roles de CI).
-- Checkov no se ha ejecutado (no está instalado en esta máquina).
-- Alertas de SNAT (métricas del NAT Gateway) y de salud del firewall.
-- DR en una segunda región (hub + egress propios, el 0/0 no cruza hubs).
+- Verify the application rules after deployment: HTTPS without SNI, QUIC, and the `AZFWApplicationRule` logs.
+- Test `app1_dns_via_firewall = true` (requires Private DNS zone links on `vnet-egress`).
+- Alerts (health, SNAT utilization, threat intelligence hits).
+- Exercise isolation between spokes with a second spoke; inbound through the public subnets; AKS, Container Apps and Function inside `app1`.
+- CI (plan/apply workflows). CI identity permissions must live in a separate persistent root, not in the state of the stack they deploy.
+- Run Checkov (not installed locally).
+- Disaster recovery in a second region (own hub and egress VNet; `0.0.0.0/0` does not cross hubs).
