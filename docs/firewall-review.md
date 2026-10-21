@@ -4,7 +4,7 @@ Se comparó la configuración con las recomendaciones oficiales de Microsoft: [A
 
 ## Conclusión
 
-No faltan reglas "predeterminadas": Azure no ofrece un paquete de reglas listo para aplicar. Lo que Microsoft mantiene (inteligencia de amenazas, FQDN tags, service tags, web categories, IDPS en Premium) se usa dentro de reglas propias. Con la salida abierta **a propósito**, el firewall hoy actúa como punto de SNAT, de inteligencia de amenazas y de registro; no filtra por dominio ni por categoría. Es una decisión de diseño, no un fallo, pero conviene saberlo.
+No faltan reglas "predeterminadas": Azure no ofrece un paquete de reglas listo para aplicar. Lo que Microsoft mantiene (inteligencia de amenazas, FQDN tags, service tags, web categories, IDPS en Premium) se usa dentro de reglas propias. Partimos de una salida abierta, y el firewall hoy actúa como punto de SNAT, de inteligencia de amenazas y de registro; no filtra por dominio ni por categoría. Ese punto de partida fue un **supuesto de diseño mío**: el propietario pidió la salida abierta para los NSG de la VNet, no dijo nada específico sobre el firewall. Está pendiente decidir si el firewall debe filtrar.
 
 ## Estado frente a las recomendaciones
 
@@ -20,7 +20,7 @@ No faltan reglas "predeterminadas": Azure no ofrece un paquete de reglas listo p
 | DNS proxy | **Activado en la política**. Para que surta efecto la VNet debe usar la IP del firewall como DNS (`app1_dns_via_firewall`, por defecto `false`; ver abajo) |
 | Alertas de rendimiento y salud (throughput, health state, SNAT port utilization, latency probe) y de aciertos de inteligencia de amenazas | **Falta** |
 | Policy analytics | **Activado** (bloque `insights` de la política, mismo workspace del diagnóstico). Útil sobre todo con un firewall persistente: solo analiza lo que ocurre después de activarlo y necesita datos acumulados |
-| Reglas de aplicación (FQDN/SNI), FQDN tags, web categories | No se usan: la salida está abierta por decisión del propietario |
+| Reglas de aplicación (FQDN/SNI), FQDN tags, web categories | No se usan: se partió de una salida abierta (supuesto, pendiente de decidir) |
 | IDPS, TLS inspection, filtrado por URL | No disponible en Standard; requiere Premium (precio sin consultar) |
 | Mantenimiento controlado por el cliente | No configurado (menor) |
 

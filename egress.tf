@@ -103,7 +103,10 @@ resource "azurerm_firewall_policy" "egress" {
   tags = local.tags
 }
 
-# Salida ABIERTA (decision del propietario: "la salida debe estar abierta").
+# Salida ABIERTA en el firewall: SUPUESTO inicial de diseno, NO una decision
+# explicita del propietario para el firewall (su "la salida debe estar
+# abierta" se dijo sobre los NSG de la VNet). Pendiente de decidir si el
+# firewall debe filtrar (ver docs/firewall-review.md).
 # Orden: primero se niegan destinos privados (los spokes solo salen a
 # internet), luego se permite todo lo demas. Para filtrar por FQDN mas
 # adelante basta con anadir reglas de aplicacion antes de la 200.

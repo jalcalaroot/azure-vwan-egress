@@ -4,7 +4,9 @@ Salida centralizada a internet con Virtual WAN. Diseño y razones en `docs/desig
 
 ## Reglas del propietario
 
-- Salida **abierta** (sin filtrado por FQDN). No restringirla sin que lo pida. La inteligencia de amenazas en `Deny` solo bloquea destinos maliciosos conocidos y fue aprobada por el propietario.
+- Salida de los **NSG** abierta: decisión del propietario ("la salida debe estar abierta").
+- Salida del **firewall** abierta (sin filtrado por dominio ni categoría): **supuesto mío, no una decisión del propietario**. Está pendiente decidir si el firewall debe filtrar. No cerrarla sin que lo pida.
+- La inteligencia de amenazas en `Deny` solo bloquea destinos maliciosos conocidos y fue aprobada por el propietario (2026-10-21).
 - Mostrar cada comando y esperar confirmación antes de crear o modificar recursos en la nube.
 - Sin IDs reales (suscripción, tenant, cuentas) ni correos en archivos versionados: marcadores como `<SUBSCRIPTION_ID>`.
 - Los commits usan el correo noreply de GitHub.

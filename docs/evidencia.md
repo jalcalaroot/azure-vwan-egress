@@ -33,7 +33,7 @@ En los primeros minutos tras crear las VMs, la VM de la zona 2 tuvo una petició
 - Aislamiento entre spokes (solo hay `app1`).
 - Entrada por las subnets públicas (no hay Application Gateway ni balanceador desplegados).
 - AKS, Container Apps y Function dentro de `app1` (las subnets existen, los servicios no).
-- Filtrado por FQDN (la salida está abierta a propósito).
+- Filtrado por FQDN (la salida del firewall se dejó abierta por un supuesto de diseño).
 
 ## Baja completa
 

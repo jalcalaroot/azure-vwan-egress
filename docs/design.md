@@ -95,7 +95,7 @@ En `snet-app` hay **dos VMs de prueba**, una por zona (`vm-app1-test-z1` y `-z2`
 
 - Solo hay una VNet de aplicación (`app1`); otras se conectan con `modules/spoke-connection` (ver `spoke-contract.md`). El aislamiento entre spokes no se puede probar con una sola.
 - No define DNS privado centralizado (las zonas `privatelink.*` siguen vinculadas por VNet).
-- No filtra por FQDN (salida abierta por decisión del propietario; se puede endurecer añadiendo reglas de aplicación antes de la regla `allow-all-outbound`).
+- No filtra por FQDN: la salida del firewall está abierta por un supuesto de diseño (no una decisión explícita del propietario; pendiente de decidir). Para filtrar no basta con añadir reglas de aplicación: las reglas de red se evalúan primero y `allow-all-outbound` las dejaría sin efecto (ver `firewall-review.md`).
 - No incluye CI ni identidades de CI todavía (ver pendientes en `CLAUDE.md`).
 
 ## Costo (precios de lista de Azure Retail Prices, eastus, consultados el 2026-10-19)
