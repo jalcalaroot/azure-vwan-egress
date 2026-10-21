@@ -1,0 +1,29 @@
+flowchart TB
+    USERS(["Internet (users)"])
+    ENTRY["<b>app1 VNet · ENTRY subnets</b><br/>public · appgw · apim<br/>replies and own egress leave directly"]
+    PRIVATE["<b>app1 VNet · PRIVATE subnets</b><br/>app · aks · privatelink · containerapps · func<br/>Test VMs: zone 1 · zone 2<br/>(app1 has no NAT Gateway of its own)"]
+    HUB{{"<b>Virtual WAN hub</b> 10.250.0.0/23<br/>learned route 0.0.0.0/0 → firewall"}}
+    FW["<b>Egress VNet · Azure Firewall</b><br/>Standard · 3 zones<br/>threat intelligence · logs · SNAT"]
+    NAT["<b>Egress VNet · NAT Gateway</b> StandardV2<br/>static public IP"]
+    WEB(["Internet (destinations)<br/>see the NAT public IP"])
+
+    USERS ==> ENTRY
+    PRIVATE ==> HUB
+    HUB ==> FW
+    FW ==> NAT
+    NAT ==> WEB
+    USERS ~~~ PRIVATE
+
+    classDef inbound fill:#e6f4ea,stroke:#2e7d32,stroke-width:2px,color:#1b4332
+    classDef private fill:#e8f0fe,stroke:#1a56db,stroke-width:2px,color:#12306b
+    classDef transit fill:#fff4e0,stroke:#e08a00,stroke-width:2px,color:#6b3d00
+    classDef egress fill:#f3e8ff,stroke:#7e22ce,stroke-width:2px,color:#3b0764
+    classDef net fill:#f1f3f4,stroke:#5f6368,stroke-width:2px,color:#202124
+    class ENTRY inbound
+    class PRIVATE private
+    class HUB transit
+    class FW,NAT egress
+    class USERS,WEB net
+    linkStyle 0 stroke:#2e7d32,stroke-width:3px
+    linkStyle 1,2,3,4 stroke:#1a56db,stroke-width:3px
+    linkStyle 5 stroke:transparent

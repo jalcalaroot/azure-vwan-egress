@@ -4,34 +4,10 @@ Centralized internet egress for application VNets using **Azure Virtual WAN**: e
 
 ## Architecture
 
-```
-                           Internet
-                               │ inbound (public, appgw, apim)
-                               ▼
-┌─ app1 · vnet-app1 10.1.0.0/16 · no NAT of its own ─────────────────┐
-│ entry:    snet-public · snet-appgw · snet-apim   (0/0 → Internet)  │
-│ private:  snet-app · snet-aks · snet-privatelink ·                 │
-│           snet-containerapps · snet-func · snet-aks-virtual-nodes  │
-│ data:     snet-data   (0/0 → None, no internet)                    │
-│                                                                    │
-│ snet-app 10.1.8.0/22, test instances (no public IP):               │
-│    vm-app1-test-z1 (zone 1) · vm-app1-test-z2 (zone 2)             │
-└──────────────────────────────┬─────────────────────────────────────┘
-                               │ 0/0 learned from the hub (no UDR)
-┌─ Virtual WAN Standard ───────▼─────────────────────────────────────┐
-│ virtual hub 10.250.0.0/23  ·  rt-spokes  ·  rt-egress              │
-└──────────────────────────────┬─────────────────────────────────────┘
-                               │ static route 0/0 → 10.251.0.4
-┌─ vnet-egress 10.251.0.0/24 ──▼─────────────────────────────────────┐
-│ Azure Firewall Standard (3 zones) 10.251.0.4                       │
-│    │ SNAT                                                          │
-│    ▼                                                               │
-│ NAT Gateway StandardV2 (zone-redundant, static public IP)          │
-└──────────────────────────────┬─────────────────────────────────────┘
-                               │ outbound (NAT public IP)
-                               ▼
-                           Internet
-```
+![Architecture](docs/architecture.png)
+
+- **Green:** inbound traffic enters through each VNet's own public subnets (`public`, `appgw`, `apim`), which also keep a direct outbound path for their replies.
+- **Blue:** every private subnet leaves through the hub's `0.0.0.0/0` route to the firewall, which performs SNAT through the NAT Gateway. Destinations see a single, stable public IP.
 
 A NAT Gateway cannot sit in a Virtual WAN hub or receive traffic from another VNet, so the egress lives in its own VNet behind the hub ([Azure NAT Gateway FAQ](https://learn.microsoft.com/azure/nat-gateway/faq)). The hub's `rt-spokes` carries the `0.0.0.0/0` route to the firewall, so spokes cannot see each other.
 
