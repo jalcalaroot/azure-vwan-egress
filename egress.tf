@@ -107,9 +107,17 @@ resource "azurerm_firewall_policy" "egress" {
 # explicita del propietario para el firewall (su "la salida debe estar
 # abierta" se dijo sobre los NSG de la VNet). Pendiente de decidir si el
 # firewall debe filtrar (ver docs/firewall-review.md).
-# Orden: primero se niegan destinos privados (los spokes solo salen a
-# internet), luego se permite todo lo demas. Para filtrar por FQDN mas
-# adelante basta con anadir reglas de aplicacion antes de la 200.
+#
+# Orden de evaluacion (Microsoft: las reglas de red van ANTES que las de
+# aplicacion y son terminantes):
+#   1. Red 100  deny RFC1918: los spokes solo salen a internet.
+#   2. Red 200  allow del resto de puertos/protocolos, EXCEPTO TCP 80/443 y
+#      UDP 443 (QUIC): asi el trafico web cae en las reglas de aplicacion,
+#      que lo registran por DOMINIO (tabla AZFWApplicationRule). Los clientes
+#      con QUIC vuelven a TCP 443 por si solos.
+#   3. Aplicacion 250 (opcional) deny de categorias web: var.denied_web_categories.
+#   4. Aplicacion 300 allow HTTP/HTTPS a cualquier dominio.
+# Si una regla de red permitiera 80/443, las de aplicacion nunca se evaluarian.
 resource "azurerm_firewall_policy_rule_collection_group" "egress" {
   name               = "rcg-egress"
   firewall_policy_id = azurerm_firewall_policy.egress.id
@@ -133,16 +141,81 @@ resource "azurerm_firewall_policy_rule_collection_group" "egress" {
   }
 
   network_rule_collection {
-    name     = "allow-outbound-internet"
+    name     = "allow-outbound-non-web"
     priority = 200
     action   = "Allow"
 
     rule {
-      name                  = "allow-all-outbound"
-      protocols             = ["TCP", "UDP", "ICMP"]
+      name                  = "allow-tcp-non-web"
+      protocols             = ["TCP"]
+      source_addresses      = [var.spoke_address_space]
+      destination_addresses = ["*"]
+      destination_ports     = ["1-79", "81-442", "444-65535"]
+    }
+
+    rule {
+      name                  = "allow-udp-non-quic"
+      protocols             = ["UDP"]
+      source_addresses      = [var.spoke_address_space]
+      destination_addresses = ["*"]
+      destination_ports     = ["1-442", "444-65535"]
+    }
+
+    rule {
+      name                  = "allow-icmp"
+      protocols             = ["ICMP"]
       source_addresses      = [var.spoke_address_space]
       destination_addresses = ["*"]
       destination_ports     = ["*"]
+    }
+  }
+
+  # Requiere firewall y politica Premium (documentacion del proveedor); con
+  # Standard la API probablemente lo rechace. Por eso la lista esta vacia por
+  # defecto.
+  dynamic "application_rule_collection" {
+    for_each = length(var.denied_web_categories) > 0 ? [1] : []
+    content {
+      name     = "deny-web-categories"
+      priority = 250
+      action   = "Deny"
+
+      rule {
+        name              = "deny-categories"
+        source_addresses  = [var.spoke_address_space]
+        web_categories    = var.denied_web_categories
+        destination_fqdns = []
+
+        protocols {
+          type = "Http"
+          port = 80
+        }
+        protocols {
+          type = "Https"
+          port = 443
+        }
+      }
+    }
+  }
+
+  application_rule_collection {
+    name     = "allow-web"
+    priority = 300
+    action   = "Allow"
+
+    rule {
+      name              = "allow-all-web"
+      source_addresses  = [var.spoke_address_space]
+      destination_fqdns = ["*"]
+
+      protocols {
+        type = "Http"
+        port = 80
+      }
+      protocols {
+        type = "Https"
+        port = 443
+      }
     }
   }
 }

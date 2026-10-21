@@ -92,3 +92,9 @@ variable "app1_dns_via_firewall" {
   type        = bool
   default     = false
 }
+
+variable "denied_web_categories" {
+  description = "Categorias web que el firewall niega (HTTP/HTTPS). Vacio = no se niega ninguna. Segun la documentacion del proveedor azurerm, web_categories exige firewall y politica Premium (con Standard probablemente falle al aplicar); por eso el default es vacio. Propuesta pendiente de Premium: Child abuse images, Criminal activity e Illegal software (nombres exactos segun la documentacion de azurerm)."
+  type        = list(string)
+  default     = []
+}

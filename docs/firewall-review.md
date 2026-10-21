@@ -20,9 +20,28 @@ No faltan reglas "predeterminadas": Azure no ofrece un paquete de reglas listo p
 | DNS proxy | **Activado en la política**. Para que surta efecto la VNet debe usar la IP del firewall como DNS (`app1_dns_via_firewall`, por defecto `false`; ver abajo) |
 | Alertas de rendimiento y salud (throughput, health state, SNAT port utilization, latency probe) y de aciertos de inteligencia de amenazas | **Falta** |
 | Policy analytics | **Activado** (bloque `insights` de la política, mismo workspace del diagnóstico). Útil sobre todo con un firewall persistente: solo analiza lo que ocurre después de activarlo y necesita datos acumulados |
-| Reglas de aplicación (FQDN/SNI), FQDN tags, web categories | No se usan: se partió de una salida abierta (supuesto, pendiente de decidir) |
+| Reglas de aplicación por dominio | **Añadidas** (2026-10-21, sin desplegar): HTTP/HTTPS a cualquier dominio, para registrar cada dominio. Ver "Reglas actuales" |
+| Web categories | **Preparadas pero vacías** (`denied_web_categories = []`): el proveedor de Terraform dice que exigen Premium (+US$0,50/h) |
+| FQDN tags | No se usan: solo sirven para listas blancas, que cerrarían la salida |
 | IDPS, TLS inspection, filtrado por URL | No disponible en Standard; requiere Premium (precio sin consultar) |
 | Mantenimiento controlado por el cliente | No configurado (menor) |
+
+## Reglas actuales (opción elegida: salida abierta con visibilidad por dominio)
+
+Las reglas de red se evalúan antes que las de aplicación y son terminantes, por eso la regla de red ya no cubre el tráfico web.
+
+| Orden | Tipo | Regla | Efecto |
+|---|---|---|---|
+| 100 | Red, Deny | `deny-rfc1918` | Los spokes solo salen a internet |
+| 200 | Red, Allow | `allow-tcp-non-web` (TCP 1-79, 81-442, 444-65535), `allow-udp-non-quic` (UDP 1-442, 444-65535), `allow-icmp` | Todo lo demás sigue abierto |
+| 250 | Aplicación, Deny | `deny-categories` (solo si `denied_web_categories` no está vacío) | Bloquea las categorías indicadas (Premium) |
+| 300 | Aplicación, Allow | `allow-all-web` (HTTP 80 y HTTPS 443, FQDN `*`) | Permite todo el tráfico web y lo registra por dominio en `AZFWApplicationRule` |
+
+Cambios de comportamiento que hay que verificar al desplegar (no probados):
+- HTTPS se decide por SNI. Una conexión HTTPS sin SNI (por ejemplo, hacia una IP directa) no coincidiría con ninguna regla y quedaría denegada.
+- UDP 443 (QUIC / HTTP/3) ya no se permite, para que no esquive el registro por dominio; los clientes vuelven a TCP 443.
+- En HTTP el firewall resuelve el dominio con su propio DNS y puede descartar tráfico si el puerto de la cabecera Host no coincide.
+- Las categorías propuestas para cuando haya Premium: *Child abuse images*, *Criminal activity* e *Illegal software* (no *Hacking*, que bloquearía sitios de seguridad).
 
 ## DNS proxy: cómo completarlo
 
