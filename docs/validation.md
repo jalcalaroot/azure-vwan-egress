@@ -65,6 +65,10 @@ The regional Network Watcher answers live diagnostics with no extra configuratio
 - QUIC (UDP 443) could not be tested because the VM's `curl` has no HTTP/3 support.
 - `app1_dns_via_firewall` has no effect on an existing VNet (see `firewall.md`).
 
+### Teardown
+
+`terraform destroy` finished with `Destroy complete! Resources: 59 destroyed` (~23 minutes). Afterwards Azure was verified at zero: no Virtual WAN, hub, VNet, firewall, firewall policy, NAT Gateway, public IP, NSG, ASG, route table, NIC, VM, disk or Log Analytics workspace, and an empty Terraform state. The stack existed for about 1.5 hours, roughly US$3 at list price.
+
 ## Not covered
 
 - Isolation between spokes (only `app1` exists).
