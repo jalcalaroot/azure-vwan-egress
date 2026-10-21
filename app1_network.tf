@@ -682,7 +682,7 @@ resource "azurerm_route_table" "apim" {
   name                          = "rt-app1-apim"
   location                      = var.location
   resource_group_name           = var.resource_group_name
-  bgp_route_propagation_enabled = false # gateway publico de APIM: la respuesta debe salir por donde entro
+  bgp_route_propagation_enabled = false # public APIM gateway: the reply must leave where the request entered
   tags                          = local.tags
 
   route {
@@ -766,37 +766,37 @@ module "vnet" {
     appgw = {
       name                            = "snet-appgw"
       address_prefixes                = [var.appgw_subnet_cidr]
-      default_outbound_access_enabled = true # subnet de ENTRADA: salida directa a Internet via rt-app1-appgw
+      default_outbound_access_enabled = true # INBOUND subnet: direct internet egress through rt-app1-appgw
       network_security_group          = { id = azurerm_network_security_group.appgw.id }
       route_table                     = { id = azurerm_route_table.appgw.id }
     }
     app = {
       name                            = "snet-app"
       address_prefixes                = [var.app_subnet_cidr]
-      default_outbound_access_enabled = false # privada: la salida a internet es SOLO la ruta 0.0.0.0/0 del hub de Virtual WAN
+      default_outbound_access_enabled = false # private: internet egress is ONLY the 0.0.0.0/0 route from the Virtual WAN hub
       network_security_group          = { id = azurerm_network_security_group.private.id }
       route_table                     = { id = azurerm_route_table.app.id }
     }
     data = {
       name                            = "snet-data"
       address_prefixes                = [var.data_subnet_cidr]
-      default_outbound_access_enabled = false # privada: sin salida implicita, ademas de la ruta block-internet (defensa en profundidad)
+      default_outbound_access_enabled = false # private: no implicit egress, in addition to the block-internet route (defense in depth)
       network_security_group          = { id = azurerm_network_security_group.data.id }
       route_table                     = { id = azurerm_route_table.data.id }
     }
     aks = {
       name                            = "snet-aks"
       address_prefixes                = [var.aks_subnet_cidr]
-      default_outbound_access_enabled = false # privada: la salida a internet es SOLO la ruta 0.0.0.0/0 del hub de Virtual WAN
+      default_outbound_access_enabled = false # private: internet egress is ONLY the 0.0.0.0/0 route from the Virtual WAN hub
       network_security_group          = { id = azurerm_network_security_group.aks.id }
       route_table                     = { id = azurerm_route_table.aks.id }
     }
     privatelink = {
       name                              = "snet-privatelink"
       address_prefixes                  = [var.privatelink_subnet_cidr]
-      default_outbound_access_enabled   = false # privada: solo aloja Private Endpoints, no necesita salida
+      default_outbound_access_enabled   = false # private: only hosts Private Endpoints, needs no egress
       network_security_group            = { id = azurerm_network_security_group.privatelink.id }
-      private_endpoint_network_policies = "NetworkSecurityGroupEnabled" # el NSG de la subnet se aplica a la NIC de cada Private Endpoint (con "Disabled" no se aplicaba)
+      private_endpoint_network_policies = "NetworkSecurityGroupEnabled" # the subnet NSG applies to the NIC of each Private Endpoint (it would not with "Disabled")
     }
     containerapps = {
       name                            = "snet-containerapps"

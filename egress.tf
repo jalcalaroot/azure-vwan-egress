@@ -16,7 +16,7 @@ resource "azurerm_virtual_network" "egress" {
 }
 
 resource "azurerm_subnet" "firewall" {
-  name                 = "AzureFirewallSubnet" # nombre obligatorio
+  name                 = "AzureFirewallSubnet" # mandatory name
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.egress.name
   address_prefixes     = [var.egress_firewall_subnet_cidr]
