@@ -90,6 +90,16 @@ resource "azurerm_firewall_policy" "egress" {
     proxy_enabled = true
   }
 
+  # Policy Analytics: reglas poco usadas, flujos principales y analisis por
+  # regla. Necesita el mismo workspace que el diagnostico del firewall, con
+  # logs estructurados (tablas AZFW*) en el plan Analytics. Solo analiza lo
+  # que ocurre despues de activarlo; los datos tardan ~60 min en aparecer.
+  insights {
+    enabled                            = true
+    default_log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+    retention_in_days                  = var.log_analytics_retention_days
+  }
+
   tags = local.tags
 }
 

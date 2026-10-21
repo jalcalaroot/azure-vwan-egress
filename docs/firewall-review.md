@@ -19,7 +19,7 @@ No faltan reglas "predeterminadas": Azure no ofrece un paquete de reglas listo p
 | Inteligencia de amenazas en alerta y bloqueo | **Corregido** (antes `Alert`, ahora `Deny`). En modo `Alert`, una regla de red con destino 80/443 enmascara las alertas ([problema conocido](https://learn.microsoft.com/troubleshoot/azure/firewall/firewall-known-issues)) |
 | DNS proxy | **Activado en la política**. Para que surta efecto la VNet debe usar la IP del firewall como DNS (`app1_dns_via_firewall`, por defecto `false`; ver abajo) |
 | Alertas de rendimiento y salud (throughput, health state, SNAT port utilization, latency probe) y de aciertos de inteligencia de amenazas | **Falta** |
-| Policy analytics | **Falta** (bloque `insights` de la política) |
+| Policy analytics | **Activado** (bloque `insights` de la política, mismo workspace del diagnóstico). Útil sobre todo con un firewall persistente: solo analiza lo que ocurre después de activarlo y necesita datos acumulados |
 | Reglas de aplicación (FQDN/SNI), FQDN tags, web categories | No se usan: la salida está abierta por decisión del propietario |
 | IDPS, TLS inspection, filtrado por URL | No disponible en Standard; requiere Premium (precio sin consultar) |
 | Mantenimiento controlado por el cliente | No configurado (menor) |
@@ -40,5 +40,5 @@ Riesgo conocido antes de activarlo: el firewall reenvía a Azure DNS **desde `vn
 
 1. Probar `app1_dns_via_firewall = true` en el próximo despliegue (verificar DNS desde las VMs y en los logs `AZFWDnsQuery`).
 2. Alertas de salud, SNAT y aciertos de inteligencia de amenazas (hace falta un action group).
-3. Activar policy analytics.
+3. (Hecho) Policy analytics.
 4. Si en algún momento se quiere filtrar sin cerrar la salida: negar solo categorías de alto riesgo con web categories, o evaluar Premium para IDPS.
