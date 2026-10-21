@@ -22,7 +22,7 @@ Remove the NAT Gateway, its public IP and associations. The private subnets (`ap
 
 ```hcl
 module "vwan_connection" {
-  source = "github.com/jalcalaroot/azure-vwan-egress//modules/spoke-connection"
+  source = "github.com/jalcalaroot/azure-vwan-firewall-egress//modules/spoke-connection"
 
   name                  = "conn-${azurerm_virtual_network.this.name}"
   virtual_hub_id        = var.vwan_hub_id

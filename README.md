@@ -1,4 +1,4 @@
-# azure-vwan-egress
+# azure-vwan-firewall-egress
 
 Centralized internet egress for application VNets using **Azure Virtual WAN**: every private subnet leaves through one Azure Firewall behind a zone-redundant **NAT Gateway (StandardV2)**, while inbound traffic keeps entering through each VNet's own public subnets. Includes `app1`, a VNet with the same layers as [`azure-virtual-network`](https://github.com/jalcalaroot/azure-virtual-network) but no NAT of its own, with a test VM per availability zone. Standalone Terraform project — own backend, own state.
 

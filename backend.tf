@@ -1,4 +1,5 @@
-# Shared tfstate storage account of the subscription, with its own key.
+# Shared tfstate storage account of the subscription, with its own key (kept as
+# "vwan-egress" from the original project name to preserve the existing state).
 # use_azuread_auth = true: that storage account has shared_access_key_enabled = false.
 terraform {
   backend "azurerm" {

@@ -1,4 +1,4 @@
-# azure-vwan-egress
+# azure-vwan-firewall-egress
 
 Centralized internet egress with Azure Virtual WAN. The design and its reasoning are in `docs/design.md`; firewall details in `docs/firewall.md`; what application VNets must do to use the egress in `docs/spoke-contract.md`; test results in `docs/validation.md`.
 
