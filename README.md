@@ -111,7 +111,7 @@ Deployed and verified twice against a live subscription. The probe VMs in two zo
 
 ## Security
 
-Secret scanning with [gitleaks](.github/workflows/gitleaks.yml) on every pull request and push, dependency updates with Dependabot, and [OpenSSF Scorecard](.github/workflows/scorecard.yml). See [SECURITY.md](SECURITY.md).
+Secret scanning with [gitleaks](.github/workflows/gitleaks.yml) on every pull request and push, dependency updates with Dependabot, and [OpenSSF Scorecard](.github/workflows/scorecard.yml). See [security policy](https://github.com/jalcalaroot/.github/blob/main/SECURITY.md).
 
 ## Cost
 
