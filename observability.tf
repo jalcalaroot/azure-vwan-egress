@@ -1,6 +1,6 @@
 # ============================================================================
 # VNet flow logs for app1 and the egress VNet, and diagnostic settings for the
-# app1 NSGs. The firewall already logs every flow it decides on (AZFW* tables);
+# app1 NSGs, the egress VNet and the public IP addresses. The firewall already logs every flow it decides on (AZFW* tables);
 # the flow logs add per-VNet and per-subnet history, including traffic that
 # never reaches the firewall (inside app1 and towards private endpoints).
 # ============================================================================
@@ -111,5 +111,34 @@ resource "azurerm_monitor_diagnostic_setting" "app1_nsg" {
 
   enabled_log {
     category_group = "allLogs"
+  }
+}
+
+# Egress VNet and public IP addresses (NAT Gateway and firewall). Their log and
+# metric categories are exportable to Log Analytics (StandardV2 public IPs
+# expose the same categories as Standard ones). NAT Gateway metrics, virtual
+# hub metrics and private endpoint metrics are NOT exportable through
+# diagnostic settings; they are available in Azure Monitor without configuration.
+locals {
+  network_diagnostics = {
+    vnet-egress    = azurerm_virtual_network.egress.id
+    pip-nat-egress = azurerm_public_ip.nat.id
+    pip-fw-egress  = azurerm_public_ip.firewall.id
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "network" {
+  for_each = local.network_diagnostics
+
+  name                       = "diag-${each.key}"
+  target_resource_id         = each.value
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_log {
+    category_group = "allLogs"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
   }
 }

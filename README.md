@@ -25,7 +25,7 @@ A NAT Gateway cannot sit in a Virtual WAN hub or receive traffic from another VN
 | NSGs, route tables, ASGs (`app1`) | Per-subnet rules with explicit outbound allow; entry subnets keep direct internet | [NSG overview](https://learn.microsoft.com/azure/virtual-network/network-security-groups-overview) |
 | Log Analytics Workspace | Firewall resource-specific logs (`AZFW*` tables), NSG diagnostics and Traffic Analytics | [Firewall logs](https://learn.microsoft.com/azure/firewall/monitor-firewall) |
 | VNet flow logs (`app1`, `vnet-egress`) + dedicated storage account | Per-VNet and per-subnet traffic history, including flows that never reach the firewall; Traffic Analytics on top | [VNet flow logs](https://learn.microsoft.com/azure/network-watcher/vnet-flow-logs-overview) |
-| Diagnostic settings (10 `app1` NSGs) | NSG events and rule counters in Log Analytics | [NSG diagnostic logs](https://learn.microsoft.com/azure/virtual-network/virtual-network-nsg-manage-log) |
+| Diagnostic settings (10 `app1` NSGs, `vnet-egress`, 2 public IPs) | NSG events and rule counters, VNet and public IP logs and metrics in Log Analytics | [NSG diagnostic logs](https://learn.microsoft.com/azure/virtual-network/virtual-network-nsg-manage-log) |
 | 2 Linux VMs (`app1`, zones 1 and 2) | Probe instances in `snet-app`, no public IP, used to verify the egress from each zone | [Availability zones](https://learn.microsoft.com/azure/reliability/availability-zones-overview) |
 
 ## Egress policy
