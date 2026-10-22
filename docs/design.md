@@ -65,6 +65,17 @@ A single hub does not survive a regional outage; disaster recovery would need a 
 
 Rules, threat intelligence, DNS proxy and monitoring are described in [firewall.md](firewall.md).
 
+## Observability
+
+| Source | Destination | What it answers |
+|---|---|---|
+| Azure Firewall (`AZFW*` tables, resource-specific) | Log Analytics `log-vwan-egress` | Which rule decided each flow, web traffic by domain, threat intelligence hits, DNS queries |
+| VNet flow logs (`app1`, `vnet-egress`), version 2 | Dedicated storage account (30 days) and Traffic Analytics | Per-VNet and per-subnet traffic history, including traffic inside `app1` and towards private endpoints that never reaches the firewall |
+| Diagnostic settings of the 10 `app1` NSGs | Log Analytics | NSG events and rule counters |
+| Network Watcher (regional, no configuration) | Live diagnostics | Next hop, IP flow verify, effective routes |
+
+NSG flow logs retire on 2027-09-30; VNet flow logs are their replacement. The flow log storage account writes with a shared key (Network Watcher requirement) and is restricted by network rules with the `AzureServices` bypass. Flow logs, Traffic Analytics and log ingestion are billed by volume.
+
 ## Scope
 
 - One application VNet (`app1`); more are attached with [`modules/spoke-connection`](../modules/spoke-connection) following [spoke-contract.md](spoke-contract.md). Isolation between spokes needs a second spoke to be exercised.

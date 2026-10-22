@@ -98,3 +98,29 @@ variable "denied_web_categories" {
   type        = list(string)
   default     = ["ChildAbuseImages", "CriminalActivity", "IllegalSoftware"]
 }
+
+variable "flow_log_retention_days" {
+  description = "Retention of the VNet flow logs in the dedicated storage account, in days."
+  type        = number
+  default     = 30
+}
+
+variable "flow_logs_storage_account_name" {
+  description = "Name of the storage account dedicated to the VNet flow logs (globally unique, 3-24 lowercase alphanumeric characters)."
+  type        = string
+  default     = "stflowvwanjalcalaroot"
+}
+
+variable "enable_traffic_analytics" {
+  description = <<-EOT
+    Enable Traffic Analytics on the VNet flow logs (recommended by the
+    Well-Architected Framework). There is a known Azure/Terraform issue,
+    TAUserDoesNotHavePermissions (hashicorp/terraform-provider-azurerm#31139),
+    where creating the flow log fails when Traffic Analytics is enabled, even
+    with broad roles. If that happens, set this to false: the flow log itself
+    (raw capture to storage) keeps working and only the aggregated Traffic
+    Analytics dashboard is lost.
+  EOT
+  type        = bool
+  default     = true
+}

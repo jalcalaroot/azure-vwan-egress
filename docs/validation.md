@@ -74,3 +74,4 @@ The regional Network Watcher answers live diagnostics with no extra configuratio
 - Isolation between spokes (only `app1` exists).
 - Inbound through the public subnets (no Application Gateway or load balancer deployed).
 - AKS, Container Apps and Function inside `app1` (the subnets exist, the services do not).
+- VNet flow logs, Traffic Analytics and the NSG diagnostic settings, added after these runs.

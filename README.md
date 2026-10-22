@@ -23,7 +23,9 @@ A NAT Gateway cannot sit in a Virtual WAN hub or receive traffic from another VN
 | `vnet-egress` | Holds `AzureFirewallSubnet` only | [VNet overview](https://learn.microsoft.com/azure/virtual-network/virtual-networks-overview) |
 | `app1` VNet + 10 subnets | Application VNet, no own NAT; built on [`Azure/avm-res-network-virtualnetwork` v0.22.2](https://registry.terraform.io/modules/Azure/avm-res-network-virtualnetwork/azurerm/0.22.2) | [Default outbound access](https://learn.microsoft.com/azure/virtual-network/ip-services/default-outbound-access) |
 | NSGs, route tables, ASGs (`app1`) | Per-subnet rules with explicit outbound allow; entry subnets keep direct internet | [NSG overview](https://learn.microsoft.com/azure/virtual-network/network-security-groups-overview) |
-| Log Analytics Workspace | Firewall resource-specific logs (`AZFW*` tables) | [Firewall logs](https://learn.microsoft.com/azure/firewall/monitor-firewall) |
+| Log Analytics Workspace | Firewall resource-specific logs (`AZFW*` tables), NSG diagnostics and Traffic Analytics | [Firewall logs](https://learn.microsoft.com/azure/firewall/monitor-firewall) |
+| VNet flow logs (`app1`, `vnet-egress`) + dedicated storage account | Per-VNet and per-subnet traffic history, including flows that never reach the firewall; Traffic Analytics on top | [VNet flow logs](https://learn.microsoft.com/azure/network-watcher/vnet-flow-logs-overview) |
+| Diagnostic settings (10 `app1` NSGs) | NSG events and rule counters in Log Analytics | [NSG diagnostic logs](https://learn.microsoft.com/azure/virtual-network/virtual-network-nsg-manage-log) |
 | 2 Linux VMs (`app1`, zones 1 and 2) | Probe instances in `snet-app`, no public IP, used to verify the egress from each zone | [Availability zones](https://learn.microsoft.com/azure/reliability/availability-zones-overview) |
 
 ## Egress policy
@@ -81,6 +83,9 @@ To connect another application VNet, use [`modules/spoke-connection`](modules/sp
 | `app1_dns_via_firewall` | `false` | Use the firewall as DNS; effective only when set at VNet creation |
 | `probe_vm_size` / `probe_vm_zones` | `Standard_D2as_v4` / `["1","2"]` | |
 | `log_analytics_retention_days` | `30` | |
+| `flow_log_retention_days` | `30` | Retention of the VNet flow logs in storage |
+| `flow_logs_storage_account_name` | `stflowvwanjalcalaroot` | Globally unique |
+| `enable_traffic_analytics` | `true` | Set to `false` if flow log creation fails with `TAUserDoesNotHavePermissions` (known provider issue, see `variables.tf`) |
 
 ## Outputs
 

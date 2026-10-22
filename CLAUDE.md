@@ -18,6 +18,7 @@ Centralized internet egress with Azure Virtual WAN. The design and its reasoning
 - `0.0.0.0/0` does not propagate between hubs.
 - Network rules are evaluated before application rules; a network rule covering 80/443 would make the application rules unreachable.
 - x86 B-series VM sizes are not available in this subscription (`NotAvailableForSubscription`); the probe VMs use `Standard_D2as_v4`.
+- The flow log storage account name must be globally unique and differ from the one in `azure-virtual-network` (`stflowlogsjalcalaroot`).
 - A single shared resource group is used, so `app1` resources carry the `app1` suffix.
 - Web categories are accepted and enforced on Standard (FQDN-based) although the azurerm documentation says Premium.
 - The VNet module (azapi) does not detect a change from no DNS servers to a value on an existing VNet; `app1_dns_via_firewall` must be set at creation.
@@ -33,7 +34,7 @@ Deployed and validated twice (see `docs/validation.md`). Cost while deployed is 
 - Verify QUIC (UDP 443) behavior with an HTTP/3-capable client.
 - Check Policy Analytics data once the hourly aggregation has run.
 - Alerts (health, SNAT utilization, threat intelligence hits).
-- Optional VNet flow logs with Traffic Analytics, and a Connection Monitor, for history per VNet.
+- Verify the VNet flow logs, Traffic Analytics and NSG diagnostics at the next deployment (Traffic Analytics has a known provider issue: see `enable_traffic_analytics`). A Connection Monitor remains optional.
 - Exercise isolation between spokes with a second spoke; inbound through the public subnets; AKS, Container Apps and Function inside `app1`.
 - CI (plan/apply workflows). CI identity permissions must live in a separate persistent root, not in the state of the stack they deploy.
 - Run Checkov (not installed locally).
